@@ -614,7 +614,7 @@ def get_app(message):
 
     zip_file = "superior6564App.zip"
     need_files = ["Update.bat", "Python3109", "Photos_or_Icons", "Update"]
-    get_zip(zip_file, extract_path, "https://github.com/Superior-GitHub/superior6564App/archive/refs/heads/master.zip")
+    get_zip(zip_file, extract_path, "https://github.com/Zapzatron/superior6564App/archive/refs/heads/master.zip")
     extract_zip(zip_file, extract_path, temp_path)
     extract_zip("Python3109.zip", extract_path, extract_path)
     delete_zip(zip_file, extract_path)
