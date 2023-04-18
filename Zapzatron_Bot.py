@@ -612,7 +612,7 @@ def get_app(message):
         os.makedirs(extract_path)
 
     zip_file = "Zapzatron_GUI.zip"
-    need_files = ["Update.bat", "Python3109", "Photos_or_Icons", "Update"]
+    need_files = ["Update.bat", "Update_2.0.bat", "Python3109", "Photos_or_Icons", "Update", "Update_2.0"]
     get_zip(zip_file, extract_path, "https://github.com/Zapzatron/GUI/archive/refs/heads/master.zip")
     extract_zip(zip_file, extract_path, temp_path)
     extract_zip("Python3109.zip", extract_path, extract_path)

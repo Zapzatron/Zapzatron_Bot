@@ -1,6 +1,7 @@
 venv
 .idea
 logs
+temp
 data/*
 !requirements.txt
 !russian_nouns_without_io.txt
