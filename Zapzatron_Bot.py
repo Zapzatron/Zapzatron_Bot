@@ -1,7 +1,6 @@
 """
-:authors: Superior-GitHub
 :license: MIT License
-:copyright: (c) 2023 Superior-GitHub
+:copyright: (c) 2023 Zapzatron
 """
 
 
@@ -523,7 +522,7 @@ def get_app_help(message):
                         "   • Распакуй его где-нибудь\n" \
                         "   • Запусти Update.bat\n" \
                         "   • Следуй инструкциям в установщике\n" \
-                        "   • Запусти superior6564App.lnk на рабочем столе\n" \
+                        "   • Запусти Zapzatron_GUI.lnk на рабочем столе\n" \
                         "   • Наслаждайся приложением :)\n" \
                         "   • /get_app_help для вызова меня."
     bot.send_message(chat_id, get_app_help_text, reply_markup=gen_markup(["/get_app_help", "/help"]))
@@ -562,8 +561,8 @@ def get_app(message):
                 if os.path.isfile(path):
                     split_path = path.split("\\")
                     arc_path = ""
-                    for p in split_path[split_path.index("superior6564App-master"):]:
-                        if p == "superior6564App-master":
+                    for p in split_path[split_path.index("GUI-master"):]:
+                        if p == "GUI-master":
                             arc_path = f"{p[:-7]}Update"
                         else:
                             arc_path = rf"{arc_path}\{p}"
@@ -575,8 +574,8 @@ def get_app(message):
                             file_path = os.path.join(root, file)
                             split_path = file_path.split("\\")
                             arc_path = ""
-                            for p in split_path[split_path.index("superior6564App-master"):]:
-                                if p == "superior6564App-master":
+                            for p in split_path[split_path.index("GUI-master"):]:
+                                if p == "GUI-master":
                                     arc_path = f"{p[:-7]}Update"
                                 else:
                                     arc_path = rf"{arc_path}\{p}"
@@ -607,20 +606,20 @@ def get_app(message):
         os.makedirs(temp_path)
 
     bot.reply_to(message, f"Preparation of files...")
-    extract_path = rf"{temp_path}\superior6564App-master"
+    extract_path = rf"{temp_path}\GUI-master"
 
     if not os.path.exists(extract_path):
         os.makedirs(extract_path)
 
-    zip_file = "superior6564App.zip"
+    zip_file = "Zapzatron_GUI.zip"
     need_files = ["Update.bat", "Python3109", "Photos_or_Icons", "Update"]
-    get_zip(zip_file, extract_path, "https://github.com/Zapzatron/superior6564App/archive/refs/heads/master.zip")
+    get_zip(zip_file, extract_path, "https://github.com/Zapzatron/GUI/archive/refs/heads/master.zip")
     extract_zip(zip_file, extract_path, temp_path)
     extract_zip("Python3109.zip", extract_path, extract_path)
     delete_zip(zip_file, extract_path)
     create_zip(zip_file, extract_path, need_files)
     bot.reply_to(message, f"Отправляю установщик...")
-    bot.send_document(chat_id, open(rf'{extract_path}\superior6564App.zip', 'rb'))
+    bot.send_document(chat_id, open(rf'{extract_path}\Zapzatron_GUI.zip', 'rb'))
     time.sleep(2)
     clear_folder(extract_path)
 
