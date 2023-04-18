@@ -1,0 +1,6 @@
+pyTelegramBotAPI==4.10.0
+openai==0.27.0
+pytz==2022.7.1
+pip==23.0.1
+psutil==5.9.4
+free-proxy==1.1.1
