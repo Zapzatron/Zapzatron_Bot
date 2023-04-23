@@ -15,6 +15,7 @@ import time
 import zipfile
 from datetime import datetime as dt
 from telebot import apihelper
+from urllib.parse import urlparse
 from fp.fp import FreeProxy
 import openai
 import pytz as ptz
@@ -264,7 +265,9 @@ def help_message(message):
                 "     • Вызови /gen_words_help для большей информации\n" \
                 "4. Я могу помочь тебе установить наше приложение\n" \
                 "     • Вызови /get_app_help для большей информации\n" \
-                "5. ..."
+                "5. Я могу скачать и отправить тебе файл по ссылке\n" \
+                "     • Вызови /get_file_help для большей информации\n" \
+                "6. ..."
     bot.send_message(chat_id, help_text, reply_markup=gen_markup(["/help"]))
 
 
@@ -620,8 +623,72 @@ def get_app(message):
     create_zip(zip_file, extract_path, need_files)
     bot.reply_to(message, f"Отправляю установщик...")
     bot.send_document(chat_id, open(rf'{extract_path}\Zapzatron_GUI.zip', 'rb'))
-    time.sleep(2)
+    time.sleep(5)
     clear_folder(extract_path)
+
+
+@bot.message_handler(commands=['get_file_help'])
+def get_file_help(message):
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    first_name = message.from_user.first_name
+    last_name = message.from_user.last_name
+    raw_text = message.text
+    time_text = f"{get_time()}"
+    logging(logs=f"[{time_text}] "
+                 f"Id: {user_id} Fn: {first_name} "
+                 f"Ln: {last_name} Do: {raw_text}",
+            write_file=True,
+            logs_dir=logs_dir)
+
+    get_file_help_text = "Привет, Я твой помощник в установке файла по ссылке :)\n" \
+                         "Что тебе нужно сделать для установки?\n" \
+                         "   • Напиши в чат 'Get file: <ссылка>\n" \
+                         "   • Подожни немного\n" \
+                         "   • Файл готов\n" \
+                         "   • /get_file_help для вызова меня."
+    bot.send_message(chat_id, get_file_help_text, reply_markup=gen_markup(["/get_file_help", "/help"]))
+
+
+@bot.message_handler(func=lambda message: (message.text is not None) and ('/' != message.text[0]) and (message.text[:10] == "Get file: "))
+def get_file(message):
+    def clear_folder(path):
+        if not os.path.exists(path):
+            os.makedirs(path)
+        file_list = os.listdir(path)
+        for item in file_list:
+            s = os.path.join(path, item)
+            if os.path.isdir(s):
+                try:
+                    shutil.rmtree(s)
+                except OSError:
+                    pass
+            else:
+                os.remove(s)
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    first_name = message.from_user.first_name
+    last_name = message.from_user.last_name
+    raw_text = message.text
+    url = raw_text[10:]
+    time_text = f"{get_time()}"
+    temp_path = rf"{os.getcwd()}\temp\{user_id}\files"
+    logging(logs=f"[{time_text}] "
+                 f"Id: {user_id} Fn: {first_name} "
+                 f"Ln: {last_name} Do: {raw_text[:9]}",
+            write_file=True,
+            logs_dir=logs_dir)
+
+    if not os.path.exists(temp_path):
+        os.makedirs(temp_path)
+
+    file_name = os.path.basename(urlparse(url).path)
+    with open(rf"{temp_path}\{file_name}", "wb") as new_file:
+        new_file.write(requests.get(url).content)
+    time.sleep(2)
+    bot.send_document(chat_id, open(rf"{temp_path}\{file_name}", 'rb'))
+    time.sleep(5)
+    clear_folder(temp_path)
 
 
 @bot.message_handler(func=lambda message: message.text is not None and '/' not in message.text)
@@ -645,11 +712,13 @@ if __name__ == "__main__":
         proxies = {
             "http": proxy,
         }
-
+        logging(logs=f"[{get_time()}] Прокси найден: {proxies['http']}",
+                write_file=True,
+                logs_dir=logs_dir)
         apihelper.proxy = proxies
         bot.infinity_polling()
     except Exception as e:
-        logging(logs=f"\n\n[{get_time()}] Ошибка в бесконечном опросе: \n{str(e)}",
+        logging(logs=f"[{get_time()}] Ошибка в бесконечном опросе: \n{str(e)}",
                 write_file=True,
                 logs_dir=logs_dir)
     logging(logs=f"[{get_time()}] Бот выключен :(\n",
