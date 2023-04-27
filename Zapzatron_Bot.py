@@ -7,6 +7,7 @@
 import atexit
 import datetime
 import os
+import io
 import platform
 import shutil
 import sqlite3
@@ -65,22 +66,42 @@ def get_time(tz: str = 'Europe/Moscow', form: str = '%d-%m-%Y %H:%M:%S', strp: b
             return dt.now().strftime(form)
 
 
-class ExceptionHandler(telebot.ExceptionHandler):
-    def handle(self, exception):
-        logging(logs=f"[{get_time()}] Ошибка: {traceback.print_exc()}",
+def get_proxy():
+    proxy = FreeProxy(country_id=['US', 'BR'], timeout=0.5).get().strip()
+    proxies = {}
+    if proxy[:4] == "http":
+        proxies = {"http": proxy}
+    elif proxy[:5] == "https":
+        proxies = {"https": proxy}
+    response = requests.get('http://icanhazip.com', proxies=proxies)
+    if response.status_code == 200:
+        logging(logs=f"[{get_time()}] Прокси найден: {proxy}",
                 write_file=True,
                 logs_dir=logs_dir)
+        return proxies
+    else:
+        logging(logs=f"[{get_time()}] Прокси нерабочий: {proxy}",
+                write_file=True,
+                logs_dir=logs_dir)
+        get_proxy()
+
+
+class ExceptionHandler(telebot.ExceptionHandler):
+    def handle(self, exception):
+        print("-" * 120)
+        string_manager = io.StringIO()
+        traceback.print_exc(file=string_manager)
+        logging(logs=f"\033[31m[{get_time()}] Ошибка: \n{string_manager.getvalue()}\033[0m",
+                write_file=True,
+                logs_dir=logs_dir)
+        print("-" * 120)
         return True
 
 
 start_time = get_time()
 work_dir = os.getcwd()
-if platform.system() == "Windows":
-    data_dir = rf"{work_dir}\data"
-    logs_dir = rf"{work_dir}\logs"
-else:
-    data_dir = rf"{work_dir}/data"
-    logs_dir = rf"{work_dir}/logs"
+data_dir = os.path.join(work_dir, "data")
+logs_dir = os.path.join(work_dir, "logs")
 
 logging(logs=f"[{start_time}] Бот включён :)",
         write_file=True,
@@ -706,16 +727,8 @@ atexit.register(close_db)
 
 if __name__ == "__main__":
     try:
-        proxy = FreeProxy(country_id=['US', 'BR'], timeout=0.5).get().strip()
-        if proxy[:7] == "http://":
-            proxy = proxy[7:]
-        proxies = {
-            "http": proxy,
-        }
-        logging(logs=f"[{get_time()}] Прокси найден: {proxies['http']}",
-                write_file=True,
-                logs_dir=logs_dir)
-        apihelper.proxy = proxies
+        # bot.polling(non_stop=True)
+        apihelper.proxy = get_proxy()
         bot.infinity_polling()
     except Exception as e:
         logging(logs=f"[{get_time()}] Ошибка в бесконечном опросе: \n{str(e)}",

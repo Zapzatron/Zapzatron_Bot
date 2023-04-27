@@ -3,5 +3,6 @@ venv
 logs
 temp
 data/*
+tests
 !requirements.txt
 !russian_nouns_without_io.txt
