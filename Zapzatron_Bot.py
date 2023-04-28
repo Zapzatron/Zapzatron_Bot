@@ -14,6 +14,7 @@ import sqlite3
 import threading
 import time
 import zipfile
+import logging as lg
 from datetime import datetime as dt
 from telebot import apihelper
 from urllib.parse import urlparse
@@ -34,7 +35,16 @@ def logging(logs: str, print_logs: bool = True, write_file: bool = False,
             logs_file_name: str = None, logs_dir: str = "logs"):
     if print_logs:
         print(logs, flush=True)
+
     if write_file:
+        ansi_codes = {
+            "color_off": "\033[0m",
+            "red": "\033[31m"
+        }
+        for code in ansi_codes:
+            if ansi_codes[code] in logs:
+                logs = logs.replace(ansi_codes[code], "")
+
         if not os.path.exists(logs_dir):
             os.makedirs(logs_dir)
 
@@ -66,21 +76,41 @@ def get_time(tz: str = 'Europe/Moscow', form: str = '%d-%m-%Y %H:%M:%S', strp: b
             return dt.now().strftime(form)
 
 
-def get_proxy():
-    proxy = FreeProxy(country_id=['US', 'BR'], timeout=0.5).get().strip()
+def handle_exception(message=None):
+    print("-" * 120)
+    string_manager = io.StringIO()
+    traceback.print_exc(file=string_manager)
+    error = string_manager.getvalue()
+    if "KeyboardInterrupt" in error:
+        print(error[-2:])
+    if message:
+        logging(logs=f"\033[31m[{message['time_text']}] "
+                     f"Id: {message['id']} Fn: {message['fn']} "
+                     f"Ln: {message['ln']} Ошибка: \n{error}\033[0m",
+                write_file=True,
+                logs_dir=logs_dir)
+    else:
+        logging(logs=f"\033[31m[{get_time()}] Ошибка: \n{error}\033[0m",
+                write_file=True,
+                logs_dir=logs_dir)
+    print("-" * 120)
+
+
+def get_proxy(url_to_check='http://icanhazip.com'):
     proxies = {}
+    proxy = FreeProxy(country_id=['US', 'BR'], rand=True).get().strip()
     if proxy[:4] == "http":
         proxies = {"http": proxy}
     elif proxy[:5] == "https":
         proxies = {"https": proxy}
-    response = requests.get('http://icanhazip.com', proxies=proxies)
+    response = requests.get(url_to_check, proxies=proxies)
     if response.status_code == 200:
         logging(logs=f"[{get_time()}] Прокси найден: {proxy}",
                 write_file=True,
                 logs_dir=logs_dir)
         return proxies
     else:
-        logging(logs=f"[{get_time()}] Прокси нерабочий: {proxy}",
+        logging(logs=f"\033[31m[{get_time()}] Прокси нерабочий ({response.status_code}): {proxy}\033[0m",
                 write_file=True,
                 logs_dir=logs_dir)
         get_proxy()
@@ -88,13 +118,7 @@ def get_proxy():
 
 class ExceptionHandler(telebot.ExceptionHandler):
     def handle(self, exception):
-        print("-" * 120)
-        string_manager = io.StringIO()
-        traceback.print_exc(file=string_manager)
-        logging(logs=f"\033[31m[{get_time()}] Ошибка: \n{string_manager.getvalue()}\033[0m",
-                write_file=True,
-                logs_dir=logs_dir)
-        print("-" * 120)
+        handle_exception()
         return True
 
 
@@ -394,11 +418,13 @@ def gpt(message):
                      "INSERT INTO context (user_id, text, time) VALUES (?, ?, ?)", (user_id, text, time_text))
 
     except Exception:
-        logging(logs=f"[{time_text}] "
-                     f"Id: {user_id} Fn: {first_name} "
-                     f"Ln: {last_name} Ошибка: \n{traceback.print_exc()}",
-                write_file=True,
-                logs_dir=logs_dir)
+        # logging(logs=f"[{time_text}] "
+        #              f"Id: {user_id} Fn: {first_name} "
+        #              f"Ln: {last_name} Ошибка: \n{traceback.print_exc()}",
+        #         write_file=True,
+        #         logs_dir=logs_dir)
+
+        handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
         bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже. \n")
         drop_cache(message)
 
@@ -629,7 +655,7 @@ def get_app(message):
     if not os.path.exists(temp_path):
         os.makedirs(temp_path)
 
-    bot.reply_to(message, f"Preparation of files...")
+    bot.reply_to(message, f"Подготовка файлов...")
     extract_path = rf"{temp_path}\GUI-master"
 
     if not os.path.exists(extract_path):
@@ -723,17 +749,40 @@ def check_text_message(message):
         bot.reply_to(message, "Отлично, у тебя как?")
 
 
-atexit.register(close_db)
+stop_bot = False
 
-if __name__ == "__main__":
-    try:
-        # bot.polling(non_stop=True)
-        apihelper.proxy = get_proxy()
-        bot.infinity_polling()
-    except Exception as e:
-        logging(logs=f"[{get_time()}] Ошибка в бесконечном опросе: \n{str(e)}",
+
+@bot.message_handler(commands=['stop_bot'])
+def op_exit(message):
+    if message.from_user.id == 850607480:
+        global stop_bot
+        user_id = message.from_user.id
+        first_name = message.from_user.first_name
+        last_name = message.from_user.last_name
+        raw_text = message.text
+        time_text = f"{get_time()}"
+        logging(logs=f"[{time_text}] "
+                     f"Id: {user_id} Fn: {first_name} "
+                     f"Ln: {last_name} Do: {raw_text}",
                 write_file=True,
                 logs_dir=logs_dir)
-    logging(logs=f"[{get_time()}] Бот выключен :(\n",
-            write_file=True,
-            logs_dir=logs_dir)
+        bot.reply_to(message, f"Останавливаю бота...")
+        stop_bot = True
+        bot.stop_polling()
+
+
+atexit.register(close_db)
+
+
+if __name__ == "__main__":
+    while True:
+        try:
+            if stop_bot:
+                logging(logs=f"[{get_time()}] Бот выключен :(\n",
+                        write_file=True,
+                        logs_dir=logs_dir)
+                break
+            apihelper.proxy = get_proxy("https://example.com/")
+            bot.polling(logger_level=lg.NOTSET)
+        except Exception:
+            handle_exception()
