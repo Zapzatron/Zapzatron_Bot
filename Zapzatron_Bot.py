@@ -2,7 +2,7 @@
 :license: MIT License
 :copyright: (c) 2023 Zapzatron
 """
-import Packages
+import source.Packages as Packages
 
 packages = {
     "whisper": "openai-whisper==20230314",
