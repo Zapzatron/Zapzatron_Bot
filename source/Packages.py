@@ -1,6 +1,7 @@
 import os
 import sys
 import subprocess
+import pkg_resources
 from importlib import import_module
 
 
@@ -22,9 +23,9 @@ def check_req_packages(packages):
                 import_module(package)
                 if "==" in packages[package]:
                     temp = packages[package].split("==")
-                    version = subprocess.run([sys.executable, "-m", "pip", "show", temp[0]], capture_output=True,
-                                             text=True)
-                    if version.stdout.split("\n")[1][9:] != temp[1]:
+                    version = pkg_resources.get_distribution(temp[0]).version
+                    # print(version, temp[1])
+                    if version != temp[1]:
                         raise ModuleNotFoundError
 
         for package in packages:

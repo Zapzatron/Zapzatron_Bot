@@ -17,7 +17,8 @@ class FreeProxy:
     """
 
     def __init__(self, country_id=None, timeout=0.5, rand=False, anonym=False,
-                 elite=False, google=None, https=False, site_to_check="www.google.com"):
+                 elite=False, google=None, https=False, site_to_check="www.google.com",
+                 repeat_count_max=2, black_list=[]):
         self.country_id = country_id
         self.timeout = timeout
         self.random = rand
@@ -26,6 +27,8 @@ class FreeProxy:
         self.google = google
         self.schema = 'https' if https else 'http'
         self.website = f'{self.schema}://{site_to_check}'
+        self.repeat_count_max = repeat_count_max
+        self.black_list = black_list
 
     def get_proxy_list(self, repeat_count):
         try:
@@ -44,7 +47,7 @@ class FreeProxy:
             FreeProxyZapzatronException(e)
 
     def __website(self, repeat_count):
-        if repeat_count > 2:
+        if repeat_count % 2 == 0:
             return "https://free-proxy-list.net"
         elif self.country_id == ['US']:
             return 'https://www.us-proxy.org'
@@ -62,27 +65,33 @@ class FreeProxy:
         https_criteria = True if self.schema == 'http' else str(row_elements[6].text_content()).lower() == 'yes'
         return country_criteria and elite_criteria and anonym_criteria and google_criteria and https_criteria
 
-    def get(self, repeat_count=0):
+    def get(self, repeat_count=1):
         """Returns a working proxy that matches the specified parameters."""
+        print(f"Попытка найти прокси {repeat_count}")
         proxy_list_tuple = self.get_proxy_list(repeat_count)
 
         if self.random:
             random.shuffle(proxy_list_tuple)
 
-        working_proxy = None
         if not proxy_list_tuple:
             raise FreeProxyZapzatronException('There are no working proxies at this time.')
 
         for proxy_address in proxy_list_tuple:
             proxies = {self.schema: f'http://{proxy_address[0]}'}
             try:
-                ip = proxies[self.schema].split(':')[1][2:]
-                with requests.get(self.website, proxies=proxies, timeout=self.timeout, stream=True) as r:
-                    if r.raw.connection.sock and r.raw.connection.sock.getpeername()[0] == ip:
-                        return proxies[self.schema], proxy_address[1]
+                ip_port = proxies[self.schema].split(':')[1:]
+                # print(ip_port, ip_port[0][2:] + ":" + ip_port[1])
+                if (ip_port[0][2:] + ":" + ip_port[1]) not in self.black_list:
+                    ip = ip_port[0][2:]
+                    with requests.get(self.website, proxies=proxies, timeout=self.timeout, stream=True) as r:
+                        if r.raw.connection.sock and r.raw.connection.sock.getpeername()[0] == ip:
+                            return proxies[self.schema], proxy_address[1]
+                else:
+                    # print("45.61.187.67:4007", flush=True)
+                    pass
             except requests.exceptions.RequestException:
-                continue
+                pass
 
-        if not working_proxy and (repeat_count or repeat_count == 0) and repeat_count < 3:
-            return self.get(repeat_count=repeat_count + 1)
+        if repeat_count and repeat_count < self.repeat_count_max:
+            return self.get(repeat_count=(repeat_count + 1))
         raise FreeProxyZapzatronException('There are no working proxies at this time.')

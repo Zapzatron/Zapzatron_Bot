@@ -5,7 +5,9 @@
 import source.Packages as Packages
 
 packages = {
+    "numba": "numba==0.56.4",
     "whisper": "openai-whisper==20230314",
+    "openai": "openai==0.27.0",
     "telebot": "pyTelegramBotAPI==4.10.0",
     "ffmpeg": "ffmpeg",
     "pytz": "pytz==2022.7.1",
@@ -13,8 +15,12 @@ packages = {
     "torch": "torch==1.11.0",
     "pydub": "pydub==0.25.1",
     "gtts": "gTTS==2.3.2",
-    "requests": "requests",
+    "requests": "requests==2.28.2",
+    "lxml": "lxml==4.9.2",
+    "dotenv": "python-dotenv==1.0.0",
+    "pymysql": "PyMySQL==1.0.3",
 }
+
 print("-" * 27)
 print("Checking required packages.")
 Packages.check_req_packages(packages)
@@ -31,7 +37,6 @@ import sqlite3
 import threading
 import time
 import zipfile
-import logging as lg
 from datetime import datetime as dt
 from telebot import apihelper
 from urllib.parse import urlparse
@@ -46,7 +51,6 @@ import pytz as ptz
 import requests
 import telebot
 import traceback
-
 
 load_dotenv("data/.env")
 
@@ -127,7 +131,8 @@ def get_proxy(last_proxy_, url_to_check='https://example.com/'):
     start = get_time(strp=True)
     proxies = {}
     country_list = ['FR', 'DE', 'US', 'CA', 'BR', 'AE', 'IN', 'TH', 'SG', 'HK', 'PH', 'VN']
-    proxy, proxy_description = FreeProxy(country_id=country_list, https=True, site_to_check="example.com").get()
+    proxy, proxy_description = FreeProxy(country_id=country_list, timeout=1.0, https=True, site_to_check="example.com",
+                                         repeat_count_max=10, black_list=["45.61.187.67:4007", ]).get()
     # print(proxy, proxy_descripton[3].text_content())
     if proxy == last_proxy_ or proxy is None:
         return False
@@ -139,8 +144,9 @@ def get_proxy(last_proxy_, url_to_check='https://example.com/'):
 
     response = requests.get(url_to_check, proxies=proxies)
     if response.status_code == 200:
-        end = get_time(strp=True)
-        logging(logs=f"[{get_time()}] Прокси: {proxy} Страна: {proxy_description[3].text_content()} Поиск длился: {end - start}",
+        search_time = get_time(strp=True) - start
+        country = proxy_description[3].text_content()
+        logging(logs=f"[{get_time()}] Прокси: {proxy} Страна: {country} Поиск длился: {search_time}",
                 write_file=True,
                 logs_dir_=logs_dir)
         return proxies
@@ -282,12 +288,12 @@ def restricted_access(func):
     return wrapper
 
 
-def gen_markup(buttons_list, buttons_dest="auto", markup_type="Reply", callback_list=None):
-    def sort_buttons(markup_, buttons, callback):
+def gen_markup(buttons_list, buttons_dest="auto", markup_type="Reply", callback_list=None, url=None, url_text=None):
+    def sort_buttons(markup_, buttons, callback, buttons_dest_):
         count = 0
         n = len(buttons)
         while True:
-            if n - 3 >= 0:
+            if n - 3 >= 0 and buttons_dest_ == 3:
                 if callback:
                     buttons_1 = telebot.types.InlineKeyboardButton(buttons[count],
                                                                    callback_data=callback[count])
@@ -303,7 +309,7 @@ def gen_markup(buttons_list, buttons_dest="auto", markup_type="Reply", callback_
                 markup_.add(buttons_1, buttons_2, buttons_3)
                 count += 3
                 n -= 3
-            elif n - 2 >= 0:
+            elif n - 2 >= 0 and buttons_dest_ >= 2:
                 if callback:
                     buttons_1 = telebot.types.InlineKeyboardButton(buttons[count],
                                                                    callback_data=callback[count])
@@ -315,7 +321,7 @@ def gen_markup(buttons_list, buttons_dest="auto", markup_type="Reply", callback_
                 markup_.add(buttons_1, buttons_2)
                 count += 2
                 n -= 2
-            elif n - 1 >= 0:
+            elif n - 1 >= 0 and buttons_dest_ >= 1:
                 if callback:
                     buttons_1 = telebot.types.InlineKeyboardButton(buttons[count],
                                                                    callback_data=callback[count])
@@ -335,14 +341,17 @@ def gen_markup(buttons_list, buttons_dest="auto", markup_type="Reply", callback_
             for button in buttons_list:
                 markup.add(button)
         elif buttons_dest == "3":
-            markup = sort_buttons(markup, buttons_list, callback_list)
+            markup = sort_buttons(markup, buttons_list, callback_list, int(buttons_dest))
     elif markup_type == "Inline":
         markup = telebot.types.InlineKeyboardMarkup()
+        if url and url_text:
+            markup.add(telebot.types.InlineKeyboardButton(text=url_text, url=url))
         if buttons_dest == "auto":
             for i in range(len(buttons_list)):
                 markup.add(telebot.types.InlineKeyboardButton(buttons_list[i], callback_data=callback_list[i]))
-        elif buttons_dest == "3":
-            markup = sort_buttons(markup, buttons_list, callback_list)
+        elif int(buttons_dest) < 4:
+            markup = sort_buttons(markup, buttons_list, callback_list, int(buttons_dest))
+
     return markup
 
 
@@ -389,13 +398,13 @@ work_with_db(user_prompts_db, data_dir,
 
 # work_with_db(user_data_db, data_dir,
 #              '''CREATE TABLE IF NOT EXISTS [name]
-#              (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, fn TEXT, ln TEXT,  count_tokens TEXT)''')
+#              (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, fn TEXT, ln TEXT, model TEXT UNIQUE, spend_tokens TEXT, remain_tokens TEXT)''')
 
 
-def help_message(message):
+def commands(message):
     chat_id = message["chat_id"]
     text = message["text"]
-    if text == "/help" or text == "/start":
+    if text == "/commands" or text == "/start":
         user_id = message["user_id"]
         first_name = message["first_name"]
         last_name = message["last_name"]
@@ -421,40 +430,75 @@ def help_message(message):
                 "6. Скачать и отправить тебе файл по ссылке\n" \
                 "     • Вызови /get_file_help для большей информации\n" \
                 "7. ...\n" \
-                "/help для вызова этого текста.\n" \
-                "Тех поддержка - degget6564business@gmail.com"
+                "/commands для вызова этого текста."
     if text == "/start":
         help_text = "Привет, добро пожаловать в Zapzatron Bot.\n" + help_text
-    if text == "/help" or text == "/start":
+    if text == "/commands" or text == "/start":
         # bot.send_message(chat_id, help_text, reply_markup=gen_markup(["/help"]))
         bot.send_message(chat_id, help_text)
     return help_text
 
 
-@bot.message_handler(commands=['drop_cache'])
-def drop_cache(message):
-    user_id = message.from_user.id
-    first_name = message.from_user.first_name
-    last_name = message.from_user.last_name
-    raw_text = message.text
-    time_text = f"{get_time()}"
-    if raw_text == "/drop_cache":
+def about_us(message):
+    chat_id = message["chat_id"]
+    text = message["text"]
+    if text == "/about_us":
+        user_id = message["user_id"]
+        first_name = message["first_name"]
+        last_name = message["last_name"]
+        time_text = f"{get_time()}"
         logging(logs=f"[{time_text}] "
                      f"Id: {user_id} Fn: {first_name} "
-                     f"Ln: {last_name} Do: {raw_text}",
+                     f"Ln: {last_name} Do: {text}",
                 write_file=True,
                 logs_dir_=logs_dir)
 
-    work_with_db(context_db, data_dir, "DELETE FROM [name] WHERE user_id=?",
-                 (user_id,))
-    try:
-        del hot_cache[user_id]
-    except KeyError:
-        pass
+    about_us_text = "Благодарим вас за использование нашего проекта!\n" \
+                    "Для вопросов и предложений → 6564degget6564@gmail.com\n" \
+                    "Для поддержки разработчика вызовите /donation"
 
-    bot.send_message(user_id, "Подожди 5 секунд пожалуйста.")
-    time.sleep(5)
-    bot.send_message(user_id, "Кэш очищен")
+    if text == "/about_us":
+        bot.send_message(chat_id, about_us_text)
+    return about_us_text
+
+
+def donation(message):
+    chat_id = message["chat_id"]
+    markup = telebot.types.InlineKeyboardMarkup()
+    button_text = "🍓 Поддержать разработчика 🍓"
+    photo = open(f'{data_dir}/TipsQRCode.png', 'rb')
+    url = "https://pay.cloudtips.ru/p/80c6b619"
+    text = "На самом деле, GPT это платная технология\n" \
+           "Также для работы бота требуется оплачивать хостинг.\n" \
+           "А разработчик активно трудится для вас."
+    markup.add(telebot.types.InlineKeyboardButton(text=button_text, url=url))
+    bot.send_photo(chat_id, photo, caption=text, reply_markup=markup)
+
+
+# @bot.message_handler(commands=['drop_cache'])
+# def drop_cache(message):
+#     user_id = message.from_user.id
+#     first_name = message.from_user.first_name
+#     last_name = message.from_user.last_name
+#     raw_text = message.text
+#     time_text = f"{get_time()}"
+#     if raw_text == "/drop_cache":
+#         logging(logs=f"[{time_text}] "
+#                      f"Id: {user_id} Fn: {first_name} "
+#                      f"Ln: {last_name} Do: {raw_text}",
+#                 write_file=True,
+#                 logs_dir_=logs_dir)
+#
+#     work_with_db(context_db, data_dir, "DELETE FROM [name] WHERE user_id=?",
+#                  (user_id,))
+#     try:
+#         del hot_cache[user_id]
+#     except KeyError:
+#         pass
+#
+#     bot.send_message(user_id, "Подожди 5 секунд пожалуйста.")
+#     time.sleep(5)
+#     bot.send_message(user_id, "Кэш очищен")
 
 
 def gpt_help(message):
@@ -482,107 +526,108 @@ def gpt_help(message):
     return gpt_help_text
 
 
-@bot.message_handler(func=lambda message: message.text[:5] == "GPT: ")
-@restricted_access
-def gpt(message):
-    chat_id = message.chat.id
-    user_id = message.from_user.id
-    first_name = message.from_user.first_name
-    last_name = message.from_user.last_name
-    raw_text = message.text
-    text = raw_text[5:]
-    time_text = get_time()
-    time_text_strp = dt.strptime(time_text, '%d-%m-%Y %H:%M:%S')
-    if not is_spam(message, datetime.timedelta(seconds=10), raw_text[:3]):
-        bot.send_message(chat_id, "Кнопки снизу обновлены.",
-                         reply_markup=gen_markup(["/drop_cache", "/gpt_help", "/help"]))
-    else:
-        return
-    try:
-        prev_text, prev_time = hot_cache.get(user_id, (None, None))
-        if prev_text and prev_time:
-            if time_text_strp - prev_time < HOT_CACHE_DURATION:
-                prompt = prev_text + '\n' + text
-                hot_cache[user_id] = (prompt, time_text_strp)
-            else:
-                prompt = text
-                hot_cache[user_id] = (prompt, time_text_strp)
-        else:
-            row = work_with_db(context_db, data_dir,
-                               "SELECT text, time FROM context WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_id,))
-            if not (row is None) and time_text_strp - dt.strptime(row[0][1], "%d-%m-%Y %H:%M:%S") < HOT_CACHE_DURATION:
-                prompt = row[0][0] + '\n' + text if row[0][0] is not None else text
-            else:
-                prompt = text
-            hot_cache[user_id] = (prompt, time_text_strp)
+# @bot.message_handler(func=lambda message: message.text[:5] == "GPT: ")
+# @restricted_access
+# def gpt(message):
+#     chat_id = message.chat.id
+#     user_id = message.from_user.id
+#     first_name = message.from_user.first_name
+#     last_name = message.from_user.last_name
+#     raw_text = message.text
+#     text = raw_text[5:]
+#     time_text = get_time()
+#     time_text_strp = dt.strptime(time_text, '%d-%m-%Y %H:%M:%S')
+#     if not is_spam(message, datetime.timedelta(seconds=10), raw_text[:3]):
+#         bot.send_message(chat_id, "Кнопки снизу обновлены.",
+#                          reply_markup=gen_markup(["/drop_cache", "/gpt_help", "/help"]))
+#     else:
+#         return
+#     try:
+#         prev_text, prev_time = hot_cache.get(user_id, (None, None))
+#         if prev_text and prev_time:
+#             if time_text_strp - prev_time < HOT_CACHE_DURATION:
+#                 prompt = prev_text + '\n' + text
+#                 hot_cache[user_id] = (prompt, time_text_strp)
+#             else:
+#                 prompt = text
+#                 hot_cache[user_id] = (prompt, time_text_strp)
+#         else:
+#             row = work_with_db(context_db, data_dir,
+#                                "SELECT text, time FROM context WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_id,))
+#             if not (row is None) and time_text_strp - dt.strptime(row[0][1], "%d-%m-%Y %H:%M:%S") < HOT_CACHE_DURATION:
+#                 prompt = row[0][0] + '\n' + text if row[0][0] is not None else text
+#             else:
+#                 prompt = text
+#             hot_cache[user_id] = (prompt, time_text_strp)
+#
+#         bot.reply_to(message, "Запрос отправлен на обработку, пожалуйста подождите.")
+#
+#         response = openai.Completion.create(
+#             model=MODELS_GPT,
+#             prompt=prompt,
+#             max_tokens=3800,
+#             temperature=0.2)
+#
+#         response_text = response.choices[0].text
+#
+#         while len(response_text) > 0:
+#             response_chunk = response_text[:MAX_MESSAGE_LENGTH]
+#             response_text = response_text[MAX_MESSAGE_LENGTH:]
+#             bot.reply_to(message, response_chunk)
+#         work_with_db(context_db, data_dir, "INSERT INTO context (user_id, text, time) VALUES (?, ?, ?)",
+#                      (user_id, text, time_text))
+#
+#     except Exception:
+#         # logging(logs=f"[{time_text}] "
+#         #              f"Id: {user_id} Fn: {first_name} "
+#         #              f"Ln: {last_name} Ошибка: \n{traceback.print_exc()}",
+#         #         write_file=True,
+#         #         logs_dir_=logs_dir)
+#
+#         handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
+#         bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже. \n")
+#         drop_cache(message)
 
-        bot.reply_to(message, "Запрос отправлен на обработку, пожалуйста подождите.")
 
-        response = openai.Completion.create(
-            model=MODELS_GPT,
-            prompt=prompt,
-            max_tokens=3800,
-            temperature=0.2)
-
-        response_text = response.choices[0].text
-
-        while len(response_text) > 0:
-            response_chunk = response_text[:MAX_MESSAGE_LENGTH]
-            response_text = response_text[MAX_MESSAGE_LENGTH:]
-
-            bot.reply_to(message, response_chunk)
-        work_with_db(context_db, data_dir,
-                     "INSERT INTO context (user_id, text, time) VALUES (?, ?, ?)", (user_id, text, time_text))
-
-    except Exception:
-        # logging(logs=f"[{time_text}] "
-        #              f"Id: {user_id} Fn: {first_name} "
-        #              f"Ln: {last_name} Ошибка: \n{traceback.print_exc()}",
-        #         write_file=True,
-        #         logs_dir_=logs_dir)
-
-        handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
-        bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже. \n")
-        drop_cache(message)
-
-
-def gpt_openai(key, model, prompt, system_message_="", chat_context=[],
+def gpt_openai(key, model, prompt, system_message_="", chat_context=None,
                temperature=1.0, max_tokens=2000, max_context=20):
     openai.api_key = key
     user_prompt = {"role": "user", "content": prompt}
+    if chat_context is None:
+        messages = [{"role": "system", "content": system_message_}, user_prompt]
+    else:
+        messages = [{"role": "system", "content": system_message_}, *chat_context, user_prompt]
     response = openai.ChatCompletion.create(
         model=model,
-        messages=[
-            {"role": "system", "content": system_message_},
-            *chat_context,
-            user_prompt,
-        ],
+        messages=messages,
         temperature=temperature,
         max_tokens=max_tokens
     )
     # print(response)
     content = response["choices"][0]["message"]["content"]
     # print(chat_context)
-    if len(chat_context) >= max_context:
-        chat_context.pop(0)
-        chat_context.pop(0)
+    if not (chat_context is None):
+        if len(chat_context) >= max_context:
+            chat_context.pop(0)
+            chat_context.pop(0)
+        chat_context.append(user_prompt)
+        chat_context.append({"role": "assistant", "content": content})
+        return content, chat_context
+    return content
 
-    chat_context.append(user_prompt)
-    chat_context.append({"role": "assistant", "content": content})
-    return content, chat_context
 
-
-def gpt_mindsdb(prompt, model, chat_context=[], max_context=20):
+def gpt_mindsdb(prompt, model, chat_context=None, max_context=20):
     user_prompt = {"role": "user", "content": prompt}
     chat = ''
-    if chat_context:
+    # print(chat_context)
+    if chat_context is None:
+        chat = prompt
+    else:
         for i in range(0, len(chat_context), 2):
             chat += 'Сообщение пользователя: ' + chat_context[i]["content"] + '\n'
             chat += 'Твоё сообщение: ' + chat_context[i + 1]["content"] + '\n'
 
         chat += 'Сообщение пользователя: ' + prompt + '\n'
-    else:
-        chat = prompt
 
     sql = f"SELECT response FROM mindsdb.{model} WHERE text='{chat}'"
 
@@ -596,7 +641,7 @@ def gpt_mindsdb(prompt, model, chat_context=[], max_context=20):
     cursor.execute(sql)
     response = cursor.fetchone()
     content = response['response']
-    if chat_context:
+    if not (chat_context is None):
         if len(chat_context) >= max_context:
             chat_context.pop(0)
             chat_context.pop(1)
@@ -648,10 +693,9 @@ def gpt3(message, command_name):
         # hot_cache_gpt3[user_id] = (text, time_text_strp, count)
         # print(hot_cache_gpt3)
         mindsdb = False
-        tokens = read_file("data/new_gpt-3.ini")
+        tokens = read_file("data/gpt-3.ini")
         model = "gpt-3.5-turbo"
-        system_message = "Ты GPT-3, большая языковая модель созданная OpenAI, " \
-                         "отвечающая точно по теме, а также как можно кратче."
+        system_message = "Ты GPT-3, большая языковая модель созданная OpenAI, отвечающая кратко точно по теме."
         temperature = 0.5
         max_tokens = 2000
         max_context = 2
@@ -666,13 +710,17 @@ def gpt3(message, command_name):
                     response_text, gpt3_context = gpt_openai(tokens[count][:51], model, text, system_message,
                                                              gpt3_context, temperature, max_tokens, max_context)
                     count += 1
-                    # print(gpt4_context)
                     restart = False
-                except openai.error.AuthenticationError:
-                    with open("bad_gpt3.ini", "w") as bad_file:
-                        tokens = bad_file.read().split("\n")
+                except (openai.error.AuthenticationError, openai.error.RateLimitError):
+                    bad_path = f"{data_dir}/bad_gpt3.ini"
+                    if not os.path.exists(bad_path):
+                        with open(bad_path, 'w') as file_w:
+                            file_w.write("")
+
+                    with open(bad_path, "r+") as bad_file:
+                        bad_tokens = bad_file.read().split("\n")
                         line = tokens[count][:51]
-                        if line not in tokens:
+                        if line not in bad_tokens:
                             bad_file.write(f"{line}\n")
                     tokens.pop(count)
             else:
@@ -724,17 +772,26 @@ def gpt4(message, command_name):
         #     count += 1
         # print(hot_cache_gpt4)
         # if not gpt4_context:
-            # gpt4_context = [{"role": "user", "content": "Hi", "time": "05.05.2023"}, {"role": "assistant", "content": "Hi", "time": "05.05.2023"}]
-            # user_prompt = {"role": "user", "content": prompt, "time": <time>} Могу ли я отправлять контекст в таком виде? (Добавил "time")
-            # temp = work_with_db(context_db, data_dir, "SELECT text, time FROM context WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_id,))
-            # print(temp)
-            # gpt4_context
-            # if not temp and time_text_strp - dt.strptime(temp[0][1], "%d-%m-%Y %H:%M:%S") < HOT_CACHE_DURATION:
-            #     prompt = temp[0][0] + '\n' + text if row[0][0] is not None else text
-            # else:
-            #     prompt = text
-            # hot_cache[user_id] = (prompt, time_text_strp)
-            # pass
+        # gpt4_context = [{"role": "user", "content": "Hi", "time": "05.05.2023"}, {"role": "assistant", "content": "Hi", "time": "05.05.2023"}]
+        # user_prompt = {"role": "user", "content": prompt, "time": <time>} Могу ли я отправлять контекст в таком виде? (Добавил "time")
+        # temp = work_with_db(context_db, data_dir, "SELECT text, time FROM context WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_id,))
+        # print(temp)
+        # gpt4_context
+        # if not temp and time_text_strp - dt.strptime(temp[0][1], "%d-%m-%Y %H:%M:%S") < HOT_CACHE_DURATION:
+        #     prompt = temp[0][0] + '\n' + text if row[0][0] is not None else text
+        # else:
+        #     prompt = text
+        # hot_cache[user_id] = (prompt, time_text_strp)
+        # pass
+        model = "gpt-4"
+        # work_with_db(user_data_db, data_dir,
+        #              "INSERT OR IGNORE INTO user_data (user_id, fn, ln, model, spend_tokens, remain_tokens) VALUES (?, ?, ?, ?, ?, ?)",
+        #              (user_id, first_name, last_name, model, 0, 0))
+        # available_tokens = work_with_db(user_data_db, data_dir,
+        #                                 "SELECT spend_tokens, remain_tokens FROM user_data WHERE user_id = ? and model = ?",
+        #                                 (user_id, model))
+        # spend_tokens = available_tokens[0][0]
+        # remain_tokens = available_tokens[0][1]
         bot.reply_to(message, "Запрос отправлен на обработку, пожалуйста подождите.")
         work_with_db(user_prompts_db, data_dir,
                      "INSERT INTO user_prompts (user_id, fn, ln, text, time, command) VALUES (?, ?, ?, ?, ?, ?)",
@@ -744,10 +801,8 @@ def gpt4(message, command_name):
         text = text.replace("\\", "/")
         # hot_cache_gpt4[user_id] = (text, time_text_strp, count)
         mindsdb = False
-        tokens = read_file("data/new_gpt-4.ini")
-        model = "gpt-4"
-        system_message = "Ты GPT-4, большая языковая модель созданная OpenAI, " \
-                         "отвечающая точно по теме, а также как можно кратче."
+        tokens = read_file("data/gpt-4.ini")
+        system_message = "Ты GPT-4, большая языковая модель созданная OpenAI, отвечающая кратко точно по теме."
         temperature = 0.5
         max_tokens = 6500
         max_context = 2
@@ -764,11 +819,16 @@ def gpt4(message, command_name):
                     count += 1
                     # print(gpt4_context)
                     restart = False
-                except openai.error.AuthenticationError:
-                    with open("bad_gpt4.ini", "w") as bad_file:
-                        tokens = bad_file.read().split("\n")
+                except (openai.error.AuthenticationError, openai.error.RateLimitError):
+                    bad_path = f"{data_dir}/bad_gpt4.ini"
+                    if not os.path.exists(bad_path):
+                        with open(bad_path, 'w') as file_w:
+                            file_w.write("")
+
+                    with open(bad_path, "r+") as bad_file:
+                        bad_tokens = bad_file.read().split("\n")
                         line = tokens[count][:51]
-                        if line not in tokens:
+                        if line not in bad_tokens:
                             bad_file.write(f"{line}\n")
                     tokens.pop(count)
             else:
@@ -776,6 +836,14 @@ def gpt4(message, command_name):
                 break
         if mindsdb:
             response_text, gpt4_context = gpt_mindsdb(text, "gpt4", gpt4_context)
+        # print(spend_tokens, len(gpt4_context[-1]["content"]), len(gpt4_context[-2]["content"]))
+        # spend_tokens = int(spend_tokens) + len(gpt4_context[-1]["content"]) + len(gpt4_context[-2]["content"])
+        # print(spend_tokens)
+        # remain_tokens = remain_tokens - spend_tokens
+        # remain_tokens = int(remain_tokens)
+        # work_with_db(user_data_db, data_dir,
+        #              "UPDATE user_data SET spend_tokens = ?, remain_tokens = ? WHERE user_id = ? and model = ?;",
+        #              (spend_tokens, remain_tokens, user_id, model))
         while len(response_text) > 0:
             response_chunk = response_text[:MAX_MESSAGE_LENGTH]
             response_text = response_text[MAX_MESSAGE_LENGTH:]
@@ -851,7 +919,9 @@ def voice_to_text(message, command_name):
         text = f"Проверь следующее предложение как можно лучше на орфографию и пунктуацию, не пропуская слов, " \
                f"переделывая матерные слова в похожие по смыслу не матерные слова, " \
                f"и выведи только правильно составленное предложение: {text}"
+        # print(text)
         response_text = gpt_mindsdb(text, "gpt4")
+        # print(response_text)
         bot.reply_to(message, "Отправка текста")
         bot.send_message(message.chat.id, response_text)
         os.remove(f"{output_dir}/voice_{user_id}.ogg")
@@ -1026,7 +1096,7 @@ def get_app_help(message):
     return get_app_help_text
 
 
-def get_app(message, command_name):
+def get_app(message):
     def clear_folder(path):
         if not os.path.exists(path):
             os.makedirs(path)
@@ -1092,7 +1162,7 @@ def get_app(message, command_name):
     time_text = f"{get_time()}"
     logging(logs=f"[{time_text}] "
                  f"Id: {user_id} Fn: {first_name} "
-                 f"Ln: {last_name} Do: {command_name}",
+                 f"Ln: {last_name} Do: {message.text}",
             write_file=True,
             logs_dir_=logs_dir)
 
@@ -1177,8 +1247,12 @@ def get_file(message, command_name):
         os.makedirs(temp_path)
 
     file_name = os.path.basename(urlparse(url).path)
-    with open(rf"{temp_path}\{file_name}", "wb") as new_file:
-        new_file.write(requests.get(url).content)
+    try:
+        with open(rf"{temp_path}\{file_name}", "wb") as new_file:
+            new_file.write(requests.get(url).content)
+    except requests.exceptions.MissingSchema:
+        bot.reply_to(message, "Возможно вы ввели неправильную ссылку, попробуйте ещё раз.")
+        return
     time.sleep(2)
     bot.send_document(chat_id, open(rf"{temp_path}\{file_name}", 'rb'))
     time.sleep(5)
@@ -1186,8 +1260,10 @@ def get_file(message, command_name):
 
 
 def menu(message, first=True):
-    buttons_list = ["GPT 🤖", "Голос ↔ Текст", "Генератор слов", "Приложение", "Ссылка → Файл", "Помощь ❔"]
-    callback_list = ["/gpt_c", "/voice_text_c", "/gen_words_c", "/get_app_c", "/get_file_c", "/help_c"]
+    buttons_list = ["GPT 🤖", "Голос ↔ Текст", "Генератор слов", "Приложение",
+                    "Ссылка ⬇︎ Файл", "Команды 🔍", "О нас ℹ︎"]
+    callback_list = ["/gpt_c", "/voice_text_c", "/gen_words_c", "/get_app_c",
+                     "/get_file_c", "/commands_c", "/about_us_c"]
     markup = gen_markup(buttons_list, buttons_dest="3", markup_type="Inline", callback_list=callback_list)
     button_text = "Выбери нужное"
     chat_id = message["chat_id"]
@@ -1209,9 +1285,13 @@ def menu(message, first=True):
 @bot.callback_query_handler(func=lambda message: True)
 def callback_buttons(message):
     def button_message(message_, button_text_):
-        chat_id = message_.message.chat.id
-        message_id = message_.message.message_id
-        bot.answer_callback_query(message_.id)
+        # print(message_.message.message_id, message_.id)
+        # chat_id = message_.message.chat.id
+        chat_id = message_["chat_id"]
+        # message_id = message_.message.message_id
+        message_id = message_["message_id"]
+        # bot.answer_callback_query(message_.id)
+        bot.answer_callback_query(message_["all_message_id"])
         buttons_list = ["Назад 🔙"]
         callback_list = ["/back_с"]
         markup = gen_markup(buttons_list, markup_type="Inline", callback_list=callback_list)
@@ -1221,6 +1301,7 @@ def callback_buttons(message):
 
     message_2 = {"chat_id": message.message.chat.id,
                  "message_id": message.message.message_id,
+                 "all_message_id": message.id,
                  "user_id": message.message.chat.id,
                  "first_name": message.message.chat.first_name,
                  "last_name": message.message.chat.last_name,
@@ -1230,19 +1311,20 @@ def callback_buttons(message):
     # print(message.message.chat.id)
     # print(message.message.message_id)
 
-    if text == "/help_c":
-        button_text = help_message(message_2)
-        button_message(message, button_text)
+    if text == "/commands_c":
+        button_message(message_2, commands(message_2))
+    elif text == "/about_us_c":
+        button_message(message_2, about_us(message_2))
     elif text == "/voice_text_c":
-        button_message(message, voice_text_help(message_2))
+        button_message(message_2, voice_text_help(message_2))
     elif text == "/gpt_c":
-        button_message(message, gpt_help(message_2))
+        button_message(message_2, gpt_help(message_2))
     elif text == "/gen_words_c":
-        button_message(message, gen_words_help(message_2))
+        button_message(message_2, gen_words_help(message_2))
     elif text == "/get_app_c":
-        button_message(message, get_app_help(message_2))
+        button_message(message_2, get_app_help(message_2))
     elif text == "/get_file_c":
-        button_message(message, get_file_help(message_2))
+        button_message(message_2, get_file_help(message_2))
     elif text == "/back_с":
         bot.answer_callback_query(message.id)
         menu(message_2, first=False)
@@ -1268,7 +1350,7 @@ def stop_bot(message):
 
 
 user_state = {}
-actions = ["/gpt4", "/gpt3", "/voice_to_text", "/text_to_voice", "/gen_words_ru", "/get_app", "/get_file"]
+actions = ["/gpt4", "/gpt3", "/voice_to_text", "/text_to_voice", "/gen_words_ru", "/get_file"]
 actions_text = {
     "/gpt4": "Отправьте вопрос к GPT4 в чат",
     "/gpt3": "Отправьте вопрос к GPT3 в чат",
@@ -1306,8 +1388,12 @@ def get_command_text(message):
             global gpt3_context
             gpt3_context = []
     elif message.content_type == "text" and text[0] == "/" and text not in actions:
-        if text == "/help" or text == "/start":
-            help_message(message_2)
+        if text == "/commands" or text == "/start":
+            commands(message_2)
+        elif text == "/about_us":
+            about_us(message_2)
+        elif text == "/donation":
+            donation(message_2)
         elif text == "/gpt_help":
             gpt_help(message_2)
         elif text == "/voice_text_help":
@@ -1318,6 +1404,8 @@ def get_command_text(message):
             get_app_help(message_2)
         elif text == "/get_file_help":
             get_file_help(message_2)
+        elif text == "/get_app":
+            get_app(message)
     elif message.content_type == "text" and text[0] != "/":
         if user_id in user_state:
             if user_state[user_id] == "/gpt4":
@@ -1328,8 +1416,6 @@ def get_command_text(message):
                 text_to_voice(message, user_state[user_id])
             elif user_state[user_id] == "/gen_words_ru":
                 gen_words(message, user_state[user_id])
-            elif user_state[user_id] == "/get_app":
-                get_app(message, user_state[user_id])
             elif user_state[user_id] == "/get_file":
                 get_file(message, user_state[user_id])
     # print(user_state)
@@ -1368,6 +1454,6 @@ if __name__ == "__main__":
                     continue
             # apihelper.proxy = {"http": "34.95.207.20:3129"}
             apihelper.RETRY_ON_ERROR = True
-            bot.polling(logger_level=lg.NOTSET)
+            bot.polling(logger_level=None)
         except Exception:
             handle_exception()
