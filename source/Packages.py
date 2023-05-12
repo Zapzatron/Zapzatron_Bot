@@ -34,7 +34,7 @@ def check_req_packages(packages):
         print(f"{checking_package} is not ok :(")
         print(f"I will try to install this automatically.")
         if checking_package == "ffmpeg":
-            ffdl_downl = subprocess.run([sys.executable, "-m", "pip", "install", "ffmpeg-downloader"], capture_output=True, text=True)
+            ffdl_downl = subprocess.run([sys.executable, "-m", "pip", "install", "ffmpeg-downloader", "--no-cache-dir"], capture_output=True, text=True)
             # print(ffdl_downl.stdout)
             # print(ffdl_downl.stderr)
             ffdl = subprocess.run(["ffdl", "install", "-y"], capture_output=True, text=True)
@@ -44,5 +44,5 @@ def check_req_packages(packages):
     except ModuleNotFoundError:
         print(f"{checking_package} is not ok :(")
         print(f"I will try to install this automatically.")
-        subprocess.run([sys.executable, "-m", "pip", "install", packages[checking_package]], capture_output=True, text=True)
+        subprocess.run([sys.executable, "-m", "pip", "install", packages[checking_package], "--no-cache-dir"], capture_output=True, text=True)
         check_req_packages(packages)

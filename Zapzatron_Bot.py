@@ -6,13 +6,13 @@ import source.Packages as Packages
 
 packages = {
     "numba": "numba==0.56.4",
+    "torch": "torch==1.11.0",
     "whisper": "openai-whisper==20230314",
     "openai": "openai==0.27.0",
     "telebot": "pyTelegramBotAPI==4.10.0",
     "ffmpeg": "ffmpeg",
     "pytz": "pytz==2022.7.1",
     "psutil": "psutil==5.9.4",
-    "torch": "torch==1.11.0",
     "pydub": "pydub==0.25.1",
     "gtts": "gTTS==2.3.2",
     "requests": "requests==2.28.2",
@@ -51,6 +51,7 @@ import pytz as ptz
 import requests
 import telebot
 import traceback
+
 
 load_dotenv("data/.env")
 
@@ -191,11 +192,9 @@ bot = telebot.TeleBot(os.environ["TELEGRAM_TOKEN"],
                       exception_handler=ExceptionHandler())
 bot.set_my_commands([
     telebot.types.BotCommand("/menu", "Вызвать меню бота"),
-    telebot.types.BotCommand("/help", "Помощь"),
     telebot.types.BotCommand("/gpt4", "GPT-4"),
     telebot.types.BotCommand("/gpt3", "GPT-3-turbo"),
-    telebot.types.BotCommand("/voice_to_text", "Голос в текст"),
-    telebot.types.BotCommand("/text_to_voice", "Текст в голос")
+    telebot.types.BotCommand("/voice_to_text", "Голос в текст")
 ])
 # Словарь для проверки на спам
 user_use_dict = {}
@@ -415,28 +414,28 @@ def commands(message):
                 write_file=True,
                 logs_dir_=logs_dir)
 
-    help_text = "Для вызова меню бота используй /menu\n" \
-                "Я могу помочь тебе в следующих действиях:\n" \
-                "1. Предоставить доступ к GPT-4 и GPT-3.5-turbo\n" \
-                "     • Вызови /gpt_help для большей информации\n" \
-                "2. Конвертировать голос ↔ текст\n" \
-                "     • Вызови /voice_text_help для большей информации\n" \
-                "3. Рассказать немного информации о тебе\n" \
-                "     • Вызови /user_info\n" \
-                "4. Сгенерировать русские слова из набора букв\n" \
-                "     • Вызови /gen_words_help для большей информации\n" \
-                "5. Помочь тебе установить наше приложение\n" \
-                "     • Вызови /get_app_help для большей информации\n" \
-                "6. Скачать и отправить тебе файл по ссылке\n" \
-                "     • Вызови /get_file_help для большей информации\n" \
-                "7. ...\n" \
-                "/commands для вызова этого текста."
+    commands_text = "Для вызова меню бота /menu\n" \
+                    "Я могу помочь тебе в следующих действиях:\n" \
+                    "1. Предоставить доступ к GPT-4 и GPT-3.5-turbo\n" \
+                    "     • Вызови /gpt_help для большей информации\n" \
+                    "2. Конвертировать голос ↔ текст\n" \
+                    "     • Вызови /voice_text_help для большей информации\n" \
+                    "3. Рассказать немного информации о тебе\n" \
+                    "     • Вызови /user_info\n" \
+                    "4. Сгенерировать русские слова из набора букв\n" \
+                    "     • Вызови /gen_words_help для большей информации\n" \
+                    "5. Помочь тебе установить наше приложение\n" \
+                    "     • Вызови /get_app_help для большей информации\n" \
+                    "6. Скачать и отправить тебе файл по ссылке\n" \
+                    "     • Вызови /get_file_help для большей информации\n" \
+                    "7. ...\n" \
+                    "/commands для вызова этого текста."
     if text == "/start":
-        help_text = "Привет, добро пожаловать в Zapzatron Bot.\n" + help_text
+        commands_text = "Привет, добро пожаловать в Zapzatron Bot.\n" + commands_text
     if text == "/commands" or text == "/start":
         # bot.send_message(chat_id, help_text, reply_markup=gen_markup(["/help"]))
-        bot.send_message(chat_id, help_text)
-    return help_text
+        bot.send_message(chat_id, commands_text)
+    return commands_text
 
 
 def about_us(message):
@@ -464,6 +463,15 @@ def about_us(message):
 
 def donation(message):
     chat_id = message["chat_id"]
+    user_id = message["user_id"]
+    first_name = message["first_name"]
+    last_name = message["last_name"]
+    time_text = f"{get_time()}"
+    logging(logs=f"[{time_text}] "
+                 f"Id: {user_id} Fn: {first_name} "
+                 f"Ln: {last_name} Do: {message['text']}",
+            write_file=True,
+            logs_dir_=logs_dir)
     markup = telebot.types.InlineKeyboardMarkup()
     button_text = "🍓 Поддержать разработчика 🍓"
     photo = open(f'{data_dir}/TipsQRCode.png', 'rb')
@@ -881,10 +889,12 @@ def voice_text_help(message):
     return voice_text_text
 
 
-whisper_model = whisper.load_model("medium")
+# whisper_model = whisper.load_model("base")
 
 
 def voice_to_text(message, command_name):
+    bot.reply_to(message, "Временно не доступно из-за ограничений на хостинге (не хватает памяти)")
+    return
     user_id = message.from_user.id
     first_name = message.from_user.first_name
     last_name = message.from_user.last_name
