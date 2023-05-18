@@ -5,5 +5,5 @@ temp
 data/*
 tests
 Zapzatron_Bot_Test.py
-!requirements.txt
-!russian_nouns_without_io.txt
+!data/requirements.txt
+!data/russian_nouns_without_io.txt
