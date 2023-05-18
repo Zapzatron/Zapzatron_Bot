@@ -6,19 +6,21 @@ import source.Packages as Packages
 
 packages = {
     "numba": "numba==0.56.4",
+    "ffmpeg": "ffmpeg",
     "torch": "torch==1.11.0",
     "whisper": "openai-whisper==20230314",
-    "openai": "openai==0.27.0",
-    "telebot": "pyTelegramBotAPI==4.10.0",
-    "ffmpeg": "ffmpeg",
-    "pytz": "pytz==2022.7.1",
-    "psutil": "psutil==5.9.4",
     "pydub": "pydub==0.25.1",
     "gtts": "gTTS==2.3.2",
+    "openai": "openai==0.27.0",
+    "EdgeGPT": "EdgeGPT==0.3.8.1",
+    "pymysql": "PyMySQL==1.0.3",
+    "telebot": "pyTelegramBotAPI==4.10.0",
+    "pytz": "pytz==2022.7.1",
+    "psutil": "psutil==5.9.4",
     "requests": "requests==2.28.2",
     "lxml": "lxml==4.9.2",
     "dotenv": "python-dotenv==1.0.0",
-    "pymysql": "PyMySQL==1.0.3",
+    "nest_asyncio": "nest_asyncio==1.5.6",
 }
 
 print("-" * 27)
@@ -51,6 +53,10 @@ import pytz as ptz
 import requests
 import telebot
 import traceback
+from EdgeGPT import Chatbot
+import asyncio
+import nest_asyncio
+import re
 
 
 load_dotenv("data/.env")
@@ -65,7 +71,11 @@ def logging(logs: str, print_logs: bool = True, write_file: bool = False,
             logs_file_name: str = None, logs_dir_: str = "logs"):
     if print_logs:
         print(logs, flush=True)
-
+        try:
+            if not (bot is None):
+                bot.send_message(-1001957630208, logs)
+        except NameError:
+            pass
     if write_file:
         ansi_codes = {
             "color_off": "\033[0m",
@@ -167,6 +177,12 @@ class ExceptionHandler(telebot.ExceptionHandler):
         return True
 
 
+nest_asyncio.apply()
+# Считывание токена телеграм бота и создание его.
+bot = telebot.TeleBot(os.environ["TELEGRAM_TOKEN"],
+                      exception_handler=ExceptionHandler())
+# bot = telebot.TeleBot(os.environ["TEST_TELEGRAM_TOKEN"],
+#                       exception_handler=ExceptionHandler())
 start_time = get_time()
 work_dir = os.getcwd()
 data_dir = os.path.join(work_dir, "data")
@@ -187,13 +203,11 @@ logging(logs=f"Информация:\n"
 
 # Считывание OpenAI токена
 openai.api_key = read_file(f'{data_dir}/tokens.ini')[1][9:]
-# Считывание токена телеграм бота и создание его.
-bot = telebot.TeleBot(os.environ["TELEGRAM_TOKEN"],
-                      exception_handler=ExceptionHandler())
+
 bot.set_my_commands([
     telebot.types.BotCommand("/menu", "Вызвать меню бота"),
     telebot.types.BotCommand("/gpt4", "GPT-4"),
-    telebot.types.BotCommand("/gpt3", "GPT-3-turbo"),
+    telebot.types.BotCommand("/bing", "Bing AI"),
     telebot.types.BotCommand("/voice_to_text", "Голос в текст")
 ])
 # Словарь для проверки на спам
@@ -416,7 +430,7 @@ def commands(message):
 
     commands_text = "Для вызова меню бота /menu\n" \
                     "Я могу помочь тебе в следующих действиях:\n" \
-                    "1. Предоставить доступ к GPT-4 и GPT-3.5-turbo\n" \
+                    "1. Предоставить доступ к GPT-4, GPT-3 и Bing AI\n" \
                     "     • Вызови /gpt_help для большей информации\n" \
                     "2. Конвертировать голос ↔ текст\n" \
                     "     • Вызови /voice_text_help для большей информации\n" \
@@ -523,11 +537,15 @@ def gpt_help(message):
                 write_file=True,
                 logs_dir_=logs_dir)
     gpt_help_text = "Что сделать для доступа к GPT?:\n" \
-                    "1. Вызови /gpt4 (GPT-4) или /gpt3 (GPT-3.5-turbo)\n" \
+                    "1. Вызови /gpt4 или /gpt3 или /bing\n" \
                     "2. Отправь вопрос в чат\n" \
                     "3. Для очистки контекста вызови тоже самое, что и в 1 пункте\n" \
-                    "Контекст сохраняет последнее сообщение\n" \
+                    "Контекст сохраняет последнее сообщение. Хранится два часа\n" \
+                    "/gpt4 - GPT-4;\n" \
+                    "/gpt3 - GPT-3.5-turbo;\n" \
+                    "/bing - Bing AI\n" \
                     "/gpt_help для вызова этого текста."
+
     if text == "/gpt_help":
         # bot.send_message(chat_id, gpt_help_text, reply_markup=gen_markup(["/drop_cache", "/gpt_help", "/help"]))
         bot.send_message(chat_id, gpt_help_text)
@@ -652,7 +670,7 @@ def gpt_mindsdb(prompt, model, chat_context=None, max_context=20):
     if not (chat_context is None):
         if len(chat_context) >= max_context:
             chat_context.pop(0)
-            chat_context.pop(1)
+            chat_context.pop(0)
 
         chat_context.append(user_prompt)
         chat_context.append({"role": "assistant", "content": content})
@@ -862,6 +880,76 @@ def gpt4(message, command_name):
         bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже.")
 
 
+async def bing_chat(prompt, chat_context=None, max_context=20):
+    # # Функция получения ответа от BingAI с использованием cookies.
+    gbot = Chatbot(cookie_path=f"{data_dir}/cookies.json")
+    user_prompt = {"role": "user", "content": prompt}
+    chat = ''
+    if chat_context is None:
+        chat = prompt
+    else:
+        for i in range(0, len(chat_context), 2):
+            chat += 'Сообщение пользователя: ' + chat_context[i]["content"] + '\n'
+            chat += 'Твоё сообщение: ' + chat_context[i + 1]["content"] + '\n'
+
+        chat += 'Сообщение пользователя: ' + prompt + '\n'
+
+    response_dict = await gbot.ask(prompt=chat)
+    # print(response_dict)
+    # print(response_dict['item']['messages'][1])
+    content = re.sub(r'\[\^(\d)\^\]', "", response_dict['item']['messages'][1]['text'])
+    content = content.replace(r"**", r"*")
+
+    if not (chat_context is None):
+        if len(chat_context) >= max_context:
+            chat_context.pop(0)
+            chat_context.pop(0)
+
+        chat_context.append(user_prompt)
+        chat_context.append({"role": "assistant", "content": content})
+        return content, chat_context
+    return content
+
+
+bing_context = []
+
+
+def bing(message, command_name):
+    global bing_context
+    user_id = message.from_user.id
+    first_name = message.from_user.first_name
+    last_name = message.from_user.last_name
+    text = message.text
+    time_text = get_time()
+
+    if not is_spam(message, datetime.timedelta(seconds=10), command_name):
+        # bot.send_message(chat_id, "Кнопки снизу обновлены.",
+        #                  reply_markup=gen_markup(["/help"]))
+        pass
+    else:
+        return
+    try:
+        bot.reply_to(message, "Запрос отправлен на обработку, пожалуйста подождите.")
+        work_with_db(user_prompts_db, data_dir,
+                     "INSERT INTO user_prompts (user_id, fn, ln, text, time, command) VALUES (?, ?, ?, ?, ?, ?)",
+                     (user_id, first_name, last_name, text, time_text, command_name))
+
+        text = text.replace("\n", "/nl")
+        text = text.replace("\\", "/")
+        response_text, bing_context = asyncio.run(bing_chat(text, bing_context, 2))
+
+        while len(response_text) > 0:
+            response_chunk = response_text[:MAX_MESSAGE_LENGTH]
+            response_text = response_text[MAX_MESSAGE_LENGTH:]
+            bot.reply_to(message, response_chunk)
+    except Exception as e:
+        bing_context = []
+        if str(e) != "'text'":
+            handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
+        bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже.\n"
+                              f"Возможно Bing AI не понравился ваш вопрос :) (Такой он)")
+
+
 def voice_text_help(message):
     chat_id = message["chat_id"]
     text = message["text"]
@@ -893,7 +981,7 @@ def voice_text_help(message):
 
 
 def voice_to_text(message, command_name):
-    bot.reply_to(message, "Временно не доступно из-за ограничений на хостинге (не хватает памяти)")
+    bot.reply_to(message, "Временно недоступно из-за ограничений на хостинге\n(не хватает памяти)")
     return
     user_id = message.from_user.id
     first_name = message.from_user.first_name
@@ -1132,31 +1220,31 @@ def get_app(message):
         time.sleep(5)
 
     def create_zip(zip_name, path_from, need_files_dirs=None):
-        with zipfile.ZipFile(rf"{path_from}\{zip_name}", 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
+        with zipfile.ZipFile(rf"{path_from}/{zip_name}", 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
             for path in need_files_dirs:
-                path = rf"{path_from}\{path}"
+                path = rf"{path_from}/{path}"
                 if os.path.isfile(path):
-                    split_path = path.split("\\")
+                    split_path = path.split("/")
                     arc_path = ""
                     for p in split_path[split_path.index("GUI-master"):]:
                         if p == "GUI-master":
                             arc_path = f"{p[:-7]}Update"
                         else:
-                            arc_path = rf"{arc_path}\{p}"
+                            arc_path = rf"{arc_path}/{p}"
 
-                    zipf.write(path, arc_path.strip("\\"))
+                    zipf.write(path, arc_path.strip("/"))
                 elif os.path.isdir(path):
                     for root, dirs, files in os.walk(path):
                         for file in files:
                             file_path = os.path.join(root, file)
-                            split_path = file_path.split("\\")
+                            split_path = file_path.split("/")
                             arc_path = ""
                             for p in split_path[split_path.index("GUI-master"):]:
                                 if p == "GUI-master":
                                     arc_path = f"{p[:-7]}Update"
                                 else:
-                                    arc_path = rf"{arc_path}\{p}"
-                            zipf.write(file_path, arc_path.strip("\\"))
+                                    arc_path = rf"{arc_path}/{p}"
+                            zipf.write(file_path, arc_path.strip("/"))
 
     def delete_zip(file, from_path):
         try:
@@ -1176,26 +1264,26 @@ def get_app(message):
             write_file=True,
             logs_dir_=logs_dir)
 
-    temp_path = rf"{os.getcwd()}\temp\{user_id}"
+    temp_path = rf"{os.getcwd()}/temp/{user_id}"
 
     if not os.path.exists(temp_path):
         os.makedirs(temp_path)
 
     bot.reply_to(message, f"Подготовка файлов...")
-    extract_path = rf"{temp_path}\GUI-master"
+    extract_path = rf"{temp_path}/GUI-master"
 
     if not os.path.exists(extract_path):
         os.makedirs(extract_path)
 
     zip_file = "Zapzatron_GUI.zip"
-    need_files = ["Update.bat", "Update_2.0.bat", "Python3109", "Photos_or_Icons", "Update", "Update_2.0"]
+    need_files = ["Update.bat", "Update_2.0.bat", "Python3109", "Photos_or_Icons", "Update", "Update_2.0", "Fonts"]
     get_zip(zip_file, extract_path, "https://github.com/Zapzatron/GUI/archive/refs/heads/master.zip")
     extract_zip(zip_file, extract_path, temp_path)
     extract_zip("Python3109.zip", extract_path, extract_path)
     delete_zip(zip_file, extract_path)
     create_zip(zip_file, extract_path, need_files)
     bot.reply_to(message, f"Отправляю установщик...")
-    bot.send_document(chat_id, open(rf'{extract_path}\Zapzatron_GUI.zip', 'rb'))
+    bot.send_document(chat_id, open(rf'{extract_path}/Zapzatron_GUI.zip', 'rb'))
     time.sleep(5)
     clear_folder(extract_path)
 
@@ -1246,7 +1334,7 @@ def get_file(message, command_name):
     last_name = message.from_user.last_name
     url = message.text.strip()
     time_text = f"{get_time()}"
-    temp_path = rf"{os.getcwd()}\temp\{user_id}\files"
+    temp_path = rf"{os.getcwd()}/temp/{user_id}/files"
     logging(logs=f"[{time_text}] "
                  f"Id: {user_id} Fn: {first_name} "
                  f"Ln: {last_name} Do: {command_name}",
@@ -1258,13 +1346,13 @@ def get_file(message, command_name):
 
     file_name = os.path.basename(urlparse(url).path)
     try:
-        with open(rf"{temp_path}\{file_name}", "wb") as new_file:
+        with open(rf"{temp_path}/{file_name}", "wb") as new_file:
             new_file.write(requests.get(url).content)
     except requests.exceptions.MissingSchema:
         bot.reply_to(message, "Возможно вы ввели неправильную ссылку, попробуйте ещё раз.")
         return
     time.sleep(2)
-    bot.send_document(chat_id, open(rf"{temp_path}\{file_name}", 'rb'))
+    bot.send_document(chat_id, open(rf"{temp_path}/{file_name}", 'rb'))
     time.sleep(5)
     clear_folder(temp_path)
 
@@ -1360,21 +1448,27 @@ def stop_bot(message):
 
 
 user_state = {}
-actions = ["/gpt4", "/gpt3", "/voice_to_text", "/text_to_voice", "/gen_words_ru", "/get_file"]
+actions = ["/gpt4", "/gpt3", "/bing", "/voice_to_text", "/text_to_voice", "/gen_words_ru", "/get_file"]
 actions_text = {
     "/gpt4": "Отправьте вопрос к GPT4 в чат",
     "/gpt3": "Отправьте вопрос к GPT3 в чат",
+    "/bing": "Отправьте вопрос к Bing AI в чат",
     "/voice_to_text": "Отправьте голосовое сообщение в чат",
     "/text_to_voice": "Отправьте текстовое сообщение в чат",
     "/gen_words_ru": "Отправьте набор русских букв в чат",
     "/get_file": "Отправьте ссылку на файл в чат"
 }
+gpt_context_duration = datetime.timedelta(hours=2)
 
 
 @bot.message_handler(content_types=["text", "voice"])
 def get_command_text(message):
+    global gpt4_context
+    global gpt3_context
+    global bing_context
     user_id = message.from_user.id
     text = message.text
+    cur_time = get_time(strp=True)
     # print(message)
     message_2 = {"chat_id": message.chat.id,
                  "message_id": message.id,
@@ -1383,20 +1477,20 @@ def get_command_text(message):
                  "last_name": message.from_user.last_name,
                  "text": text}
     # print(text)
-    if message.content_type == "voice" and user_id in user_state and user_state[user_id] == "/voice_to_text":
-        voice_to_text(message, user_state[user_id])
+    if message.content_type == "voice" and user_id in user_state and user_state[user_id][0] == "/voice_to_text":
+        voice_to_text(message, user_state[user_id][0])
     elif message.content_type == "text" and text == "/menu":
         menu(message_2)
     elif message.content_type == "text" and text[0] == "/" and text in actions:
-        user_state[user_id] = text
+        user_state[user_id] = (text, None)
         if text in actions_text:
             bot.reply_to(message, actions_text[text])
         if text == "/gpt4":
-            global gpt4_context
             gpt4_context = []
         elif text == "/gpt3":
-            global gpt3_context
             gpt3_context = []
+        elif text == "/bing":
+            bing_context = []
     elif message.content_type == "text" and text[0] == "/" and text not in actions:
         if text == "/commands" or text == "/start":
             commands(message_2)
@@ -1418,16 +1512,30 @@ def get_command_text(message):
             get_app(message)
     elif message.content_type == "text" and text[0] != "/":
         if user_id in user_state:
-            if user_state[user_id] == "/gpt4":
-                gpt4(message, user_state[user_id])
-            elif user_state[user_id] == "/gpt3":
-                gpt3(message, user_state[user_id])
-            elif user_state[user_id] == "/text_to_voice":
-                text_to_voice(message, user_state[user_id])
-            elif user_state[user_id] == "/gen_words_ru":
-                gen_words(message, user_state[user_id])
-            elif user_state[user_id] == "/get_file":
-                get_file(message, user_state[user_id])
+            if user_state[user_id][0] == "/gpt4":
+                if user_state[user_id][1] and cur_time - user_state[user_id][1] > gpt_context_duration:
+                    bot.reply_to(message, "Начинаю новый диалог из-за долгого перерыва")
+                    gpt4_context = []
+                gpt4(message, user_state[user_id][0])
+                user_state[user_id] = (user_state[user_id][0], cur_time)
+            elif user_state[user_id][0] == "/gpt3":
+                if user_state[user_id][1] and cur_time - user_state[user_id][1] > gpt_context_duration:
+                    bot.reply_to(message, "Начинаю новый диалог из-за долгого перерыва")
+                    gpt3_context = []
+                gpt3(message, user_state[user_id][0])
+                user_state[user_id] = (user_state[user_id][0], cur_time)
+            elif user_state[user_id][0] == "/bing":
+                if user_state[user_id][1] and cur_time - user_state[user_id][1] > gpt_context_duration:
+                    bot.reply_to(message, "Начинаю новый диалог из-за долгого перерыва")
+                    bing_context = []
+                bing(message, user_state[user_id][0])
+                user_state[user_id] = (user_state[user_id][0], cur_time)
+            elif user_state[user_id][0] == "/text_to_voice":
+                text_to_voice(message, user_state[user_id][0])
+            elif user_state[user_id][0] == "/gen_words_ru":
+                gen_words(message, user_state[user_id][0])
+            elif user_state[user_id][0] == "/get_file":
+                get_file(message, user_state[user_id][0])
     # print(user_state)
 
 
