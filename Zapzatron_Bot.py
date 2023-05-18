@@ -69,6 +69,14 @@ def read_file(file_name, split_symbol="\n"):
 
 def logging(logs: str, print_logs: bool = True, write_file: bool = False,
             logs_file_name: str = None, logs_dir_: str = "logs"):
+    ansi_codes = {
+        "color_off": "\033[0m",
+        "red": "\033[31m"
+    }
+    for code in ansi_codes:
+        if ansi_codes[code] in logs:
+            logs = logs.replace(ansi_codes[code], "")
+
     if print_logs:
         print(logs, flush=True)
         try:
@@ -77,14 +85,6 @@ def logging(logs: str, print_logs: bool = True, write_file: bool = False,
         except NameError:
             pass
     if write_file:
-        ansi_codes = {
-            "color_off": "\033[0m",
-            "red": "\033[31m"
-        }
-        for code in ansi_codes:
-            if ansi_codes[code] in logs:
-                logs = logs.replace(ansi_codes[code], "")
-
         if not os.path.exists(logs_dir_):
             os.makedirs(logs_dir_)
 
