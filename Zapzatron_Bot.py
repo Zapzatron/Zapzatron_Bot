@@ -1416,7 +1416,8 @@ def callback_buttons(message):
         buttons_list = ["Назад 🔙"]
         callback_list = ["/back_с"]
         markup = gen_markup(buttons_list, markup_type="Inline", callback_list=callback_list)
-        bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=button_text_, reply_markup=markup)
+        bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=button_text_, reply_markup=markup,
+                              disable_web_page_preview=True)
 
     text = message.data
 
