@@ -470,7 +470,9 @@ def about_us(message):
                 logs_dir_=logs_dir)
 
     about_us_text = "Благодарим вас за использование нашего проекта!\n" \
-                    "Для вопросов и предложений → 6564degget6564@gmail.com\n" \
+                    "Канал → https://t.me/Zapzatron_Bot_Channel\n" \
+                    "Чат → https://t.me/+NkT96igVJ180NTQy\n" \
+                    "Почта поддержки → 6564degget6564@gmail.com\n" \
                     "Для поддержки разработчика вызовите /donation"
 
     if text == "/about_us":
@@ -762,6 +764,7 @@ def gpt3(message, command_name):
             response_text = response_text[MAX_MESSAGE_LENGTH:]
             bot.reply_to(message, response_chunk)
     except Exception:
+        gpt3_context = []
         handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
         # hot_cache_gpt3 = {}
         bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже.")
@@ -878,39 +881,53 @@ def gpt4(message, command_name):
             response_text = response_text[MAX_MESSAGE_LENGTH:]
             bot.reply_to(message, response_chunk)
     except Exception:
+        gpt4_context = []
         handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
         # hot_cache_gpt4 = {}
         bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже.")
 
 
-async def bing_chat(prompt, chat_context=None, max_context=20):
+# async def bing_chat(prompt, chat_context=None, max_context=20):
+#     # # Функция получения ответа от BingAI с использованием cookies.
+#     gbot = Chatbot(cookie_path=f"{data_dir}/cookies.json")
+#     user_prompt = {"role": "user", "content": prompt}
+#     chat = ''
+#     if chat_context is None:
+#         chat = prompt
+#     else:
+#         for i in range(0, len(chat_context), 2):
+#             chat += 'Сообщение пользователя: ' + chat_context[i]["content"] + '\n'
+#             chat += 'Твоё сообщение: ' + chat_context[i + 1]["content"] + '\n'
+#
+#         chat += 'Сообщение пользователя: ' + prompt + '\n'
+#
+#     response_dict = await gbot.ask(prompt=chat)
+#     await gbot.close()
+#     # print(response_dict)
+#     # print(response_dict['item']['messages'][1])
+#     content = re.sub(r'\[\^(\d)\^\]', "", response_dict['item']['messages'][1]['text'])
+#     content = content.replace(r"**", r"*")
+#
+#     if not (chat_context is None):
+#         if len(chat_context) >= max_context:
+#             chat_context.pop(0)
+#             chat_context.pop(0)
+#
+#         chat_context.append(user_prompt)
+#         chat_context.append({"role": "assistant", "content": content})
+#         return content, chat_context
+#     return content
+
+
+async def bing_chat(prompt):
     # # Функция получения ответа от BingAI с использованием cookies.
     gbot = Chatbot(cookie_path=f"{data_dir}/cookies.json")
-    user_prompt = {"role": "user", "content": prompt}
-    chat = ''
-    if chat_context is None:
-        chat = prompt
-    else:
-        for i in range(0, len(chat_context), 2):
-            chat += 'Сообщение пользователя: ' + chat_context[i]["content"] + '\n'
-            chat += 'Твоё сообщение: ' + chat_context[i + 1]["content"] + '\n'
-
-        chat += 'Сообщение пользователя: ' + prompt + '\n'
-
-    response_dict = await gbot.ask(prompt=chat)
+    response_dict = await gbot.ask(prompt=prompt)
+    await gbot.close()
     # print(response_dict)
     # print(response_dict['item']['messages'][1])
     content = re.sub(r'\[\^(\d)\^\]', "", response_dict['item']['messages'][1]['text'])
     content = content.replace(r"**", r"*")
-
-    if not (chat_context is None):
-        if len(chat_context) >= max_context:
-            chat_context.pop(0)
-            chat_context.pop(0)
-
-        chat_context.append(user_prompt)
-        chat_context.append({"role": "assistant", "content": content})
-        return content, chat_context
     return content
 
 
