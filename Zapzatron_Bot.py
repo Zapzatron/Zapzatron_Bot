@@ -919,7 +919,7 @@ def gpt4(message, command_name):
 #     return content
 
 
-async def bing_chat(prompt):
+async def bing_chat(prompt, chat_context=None, max_context=20):
     # # Функция получения ответа от BingAI с использованием cookies.
     gbot = Chatbot(cookie_path=f"{data_dir}/cookies.json")
     response_dict = await gbot.ask(prompt=prompt)
