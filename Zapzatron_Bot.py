@@ -73,17 +73,20 @@ def logging(logs: str, print_logs: bool = True, write_file: bool = False,
         "color_off": "\033[0m",
         "red": "\033[31m"
     }
+
+    if print_logs:
+        print(logs, flush=True)
+
     for code in ansi_codes:
         if ansi_codes[code] in logs:
             logs = logs.replace(ansi_codes[code], "")
 
-    if print_logs:
-        print(logs, flush=True)
-        try:
-            if not (bot is None):
-                bot.send_message(-1001957630208, logs)
-        except NameError:
-            pass
+    try:
+        if not (bot is None):
+            bot.send_message(-1001957630208, logs)
+    except Exception:
+        pass
+
     if write_file:
         if not os.path.exists(logs_dir_):
             os.makedirs(logs_dir_)
@@ -142,7 +145,7 @@ def get_proxy(last_proxy_, url_to_check='https://example.com/'):
     start = get_time(strp=True)
     proxies = {}
     country_list = ['FR', 'DE', 'US', 'CA', 'BR', 'AE', 'IN', 'TH', 'SG', 'HK', 'PH', 'VN']
-    proxy, proxy_description = FreeProxy(country_id=country_list, timeout=1.0, https=True, site_to_check="example.com",
+    proxy, proxy_description = FreeProxy(country_id=country_list, https=True, site_to_check="example.com",
                                          repeat_count_max=10, black_list=["45.61.187.67:4007", ]).get()
     # print(proxy, proxy_descripton[3].text_content())
     if proxy == last_proxy_ or proxy is None:
@@ -1542,9 +1545,9 @@ def get_command_text(message):
 is_stop_bot = False
 
 
-def get_ip_info(proxies={}):
+def get_ip_info(proxies={}, url_to_check_ip="http://ip-api.com/json/"):
     try:
-        response = requests.get("http://ip-api.com/json/", proxies=proxies)  # Получаем информацию об IP
+        response = requests.get(url_to_check_ip, proxies=proxies)  # Получаем информацию об IP
         if response.status_code == 200:
             data = response.json()
             return data
@@ -1563,8 +1566,8 @@ if __name__ == "__main__":
                         write_file=True,
                         logs_dir_=logs_dir)
                 break
-            country = get_ip_info()["country"]
-            if not country or country == "Russia":
+            country = get_ip_info(url_to_check_ip="http://ipinfo.io/json")["country"]
+            if not country or country == "Russia" or country == "RU":
                 proxy = get_proxy(last_proxy)
                 if proxy:
                     apihelper.proxy = proxy
