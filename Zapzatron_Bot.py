@@ -919,7 +919,7 @@ def gpt4(message, command_name):
 #     return content
 
 
-async def bing_chat(prompt, chat_context=None, max_context=20):
+async def bing_chat(prompt):
     # # Функция получения ответа от BingAI с использованием cookies.
     gbot = Chatbot(cookie_path=f"{data_dir}/cookies.json")
     response_dict = await gbot.ask(prompt=prompt)
@@ -956,7 +956,8 @@ def bing(message, command_name):
 
         text = text.replace("\n", "/nl")
         text = text.replace("\\", "/")
-        response_text, bing_context = asyncio.run(bing_chat(text, bing_context, 2))
+        # response_text, bing_context = asyncio.run(bing_chat(text, bing_context, 2))
+        response_text = asyncio.run(bing_chat(text))
 
         while len(response_text) > 0:
             response_chunk = response_text[:MAX_MESSAGE_LENGTH]
