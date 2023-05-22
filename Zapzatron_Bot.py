@@ -210,8 +210,10 @@ openai.api_key = read_file(f'{data_dir}/tokens.ini')[1][9:]
 bot.set_my_commands([
     telebot.types.BotCommand("/menu", "Вызвать меню бота"),
     telebot.types.BotCommand("/gpt4", "GPT-4"),
+    telebot.types.BotCommand("/gpt3", "GPT-3"),
     telebot.types.BotCommand("/bing", "Bing AI"),
-    telebot.types.BotCommand("/voice_to_text", "Голос в текст")
+    telebot.types.BotCommand("/voice_to_text", "Голос в текст"),
+    telebot.types.BotCommand("/text_to_voice", "Голос в текст"),
 ])
 # Словарь для проверки на спам
 user_use_dict = {}
