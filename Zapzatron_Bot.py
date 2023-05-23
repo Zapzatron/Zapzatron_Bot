@@ -83,7 +83,11 @@ def logging(logs: str, print_logs: bool = True, write_file: bool = False,
 
     try:
         if not (bot is None):
-            bot.send_message(-1001957630208, logs)
+            temp = logs
+            while len(temp) > 0:
+                response_chunk = temp[:MAX_MESSAGE_LENGTH]
+                temp = temp[MAX_MESSAGE_LENGTH:]
+                bot.send_message(-1001957630208, response_chunk)
     except Exception:
         pass
 
@@ -956,6 +960,7 @@ def bing(message, command_name):
                      "INSERT INTO user_prompts (user_id, fn, ln, text, time, command) VALUES (?, ?, ?, ?, ?, ?)",
                      (user_id, first_name, last_name, text, time_text, command_name))
 
+        text = text.replace("'", '"')
         text = text.replace("\n", "/nl")
         text = text.replace("\\", "/")
         # response_text, bing_context = asyncio.run(bing_chat(text, bing_context, 2))
