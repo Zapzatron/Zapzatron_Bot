@@ -1601,6 +1601,6 @@ if __name__ == "__main__":
                     continue
             # apihelper.proxy = {"http": "34.95.207.20:3129"}
             apihelper.RETRY_ON_ERROR = True
-            bot.polling(logger_level=None)
+            bot.polling(skip_pending=True, logger_level=None)
         except Exception:
             handle_exception()
