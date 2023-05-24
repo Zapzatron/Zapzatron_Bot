@@ -1527,7 +1527,7 @@ def get_command_text(message):
     cur_time = get_time(strp=True)
     # print(message)
 
-    if cur_time - datetime.datetime.utcfromtimestamp(message.date) > datetime.timedelta(seconds=0):
+    if cur_time - datetime.datetime.utcfromtimestamp(message.date) > datetime.timedelta(minutes=2):
         return
 
     message_2 = {"chat_id": message.chat.id,
