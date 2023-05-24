@@ -123,7 +123,7 @@ def get_time(tz: str | None = 'Europe/Moscow', form: str = '%d-%m-%Y %H:%M:%S', 
             return dt.now().strftime(form)
 
 
-def handle_exception(message=None):
+def handle_exception(message=None, extra_text=None):
     print("-" * 120)
     string_manager = io.StringIO()
     traceback.print_exc(file=string_manager)
@@ -136,6 +136,10 @@ def handle_exception(message=None):
                 logs_dir_=logs_dir)
     else:
         logging(logs=f"\033[31m[{get_time()}] Ошибка: \n{error}\033[0m",
+                write_file=True,
+                logs_dir_=logs_dir)
+    if extra_text:
+        logging(logs=extra_text,
                 write_file=True,
                 logs_dir_=logs_dir)
     print("-" * 120)
@@ -700,7 +704,8 @@ def gpt_mindsdb(prompt, model, chat_context=None, max_context=20):
                                  password=os.environ["MINDSDB_PASSWORD"],
                                  db='mindsdb',
                                  charset='utf8mb4',
-                                 cursorclass=pymysql.cursors.DictCursor)
+                                 cursorclass=pymysql.cursors.DictCursor,
+                                 connect_timeout=30)
     cursor = connection.cursor()
     cursor.execute(sql)
     response = cursor.fetchone()
@@ -787,11 +792,19 @@ def gpt3(message, command_name):
                         if line not in bad_tokens:
                             bad_file.write(f"{line}\n")
                     tokens.pop(count)
+                except openai.error.APIError:
+                    extra_text = "Ошибка в предыдущем сообщении выведена, но система попробует ещё раз через 5 секунд."
+                    handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name},
+                                     extra_text)
+                    time.sleep(5)
             else:
                 mindsdb = True
                 break
         if mindsdb:
-            response_text, gpt3_context = gpt_mindsdb(text, "gpt3", gpt3_context)
+            try:
+                response_text, gpt3_context = gpt_mindsdb(text, "gpt3", gpt3_context, max_context)
+            except (pymysql.err.ProgrammingError, pymysql.err.OperationalError,):
+                response_text, gpt3_context = gpt_mindsdb(text, "gpt3", gpt3_context, max_context)
         while len(response_text) > 0:
             response_chunk = response_text[:MAX_MESSAGE_LENGTH]
             response_text = response_text[MAX_MESSAGE_LENGTH:]
@@ -896,11 +909,19 @@ def gpt4(message, command_name):
                         if line not in bad_tokens:
                             bad_file.write(f"{line}\n")
                     tokens.pop(count)
+                except openai.error.APIError:
+                    extra_text = "Ошибка в предыдущем сообщении выведена, но система попробует ещё раз через 5 секунд."
+                    handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name},
+                                     extra_text)
+                    time.sleep(5)
             else:
                 mindsdb = True
                 break
         if mindsdb:
-            response_text, gpt4_context = gpt_mindsdb(text, "gpt4", gpt4_context)
+            try:
+                response_text, gpt4_context = gpt_mindsdb(text, "gpt4", gpt4_context, max_context)
+            except (pymysql.err.ProgrammingError, pymysql.err.OperationalError, ):
+                response_text, gpt4_context = gpt_mindsdb(text, "gpt4", gpt4_context, max_context)
         # print(spend_tokens, len(gpt4_context[-1]["content"]), len(gpt4_context[-2]["content"]))
         # spend_tokens = int(spend_tokens) + len(gpt4_context[-1]["content"]) + len(gpt4_context[-2]["content"])
         # print(spend_tokens)
@@ -1073,7 +1094,10 @@ def voice_to_text(message, command_name):
                f"переделывая матерные слова в похожие по смыслу не матерные слова, " \
                f"и выведи только правильно составленное предложение: {text}"
         # print(text)
-        response_text = gpt_mindsdb(text, "gpt4")
+        try:
+            response_text = gpt_mindsdb(text, "gpt4")
+        except (pymysql.err.ProgrammingError, pymysql.err.OperationalError, ):
+            response_text = gpt_mindsdb(text, "gpt4")
         # print(response_text)
         bot.reply_to(message, "Отправка текста")
         bot.send_message(message.chat.id, response_text)
