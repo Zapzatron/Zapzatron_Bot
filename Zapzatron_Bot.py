@@ -110,7 +110,7 @@ def logging(logs: str, print_logs: bool = True, write_file: bool = False,
                 logs_file.write(logs + "\n")
 
 
-def get_time(tz: str = 'Europe/Moscow', form: str = '%d-%m-%Y %H:%M:%S', strp: bool = False):
+def get_time(tz: str | None = 'Europe/Moscow', form: str = '%d-%m-%Y %H:%M:%S', strp: bool = False):
     if strp:
         if tz:
             return dt.strptime(dt.now(ptz.timezone(tz)).strftime(form), form)
@@ -1526,8 +1526,11 @@ def get_command_text(message):
     text = message.text
     cur_time = get_time(strp=True)
     # print(message)
-
-    if cur_time - datetime.datetime.utcfromtimestamp(message.date) > datetime.timedelta(minutes=2):
+    # print(message.date)
+    # print(get_time(tz=None, strp=True), dt.fromtimestamp(message.date))
+    # print(get_time(tz=None, strp=True) - dt.fromtimestamp(message.date))
+    # print(round(time.time()) - message.date)
+    if round(time.time()) - message.date > 1 * 60:  # 1 минута
         return
 
     message_2 = {"chat_id": message.chat.id,
