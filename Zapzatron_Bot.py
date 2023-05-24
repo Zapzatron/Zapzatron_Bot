@@ -186,10 +186,10 @@ class ExceptionHandler(telebot.ExceptionHandler):
 
 nest_asyncio.apply()
 # Считывание токена телеграм бота и создание его.
-# bot = telebot.TeleBot(os.environ["TELEGRAM_TOKEN"],
-#                       exception_handler=ExceptionHandler())
-bot = telebot.TeleBot(os.environ["TEST_TELEGRAM_TOKEN"],
+bot = telebot.TeleBot(os.environ["TELEGRAM_TOKEN"],
                       exception_handler=ExceptionHandler())
+# bot = telebot.TeleBot(os.environ["TEST_TELEGRAM_TOKEN"],
+#                       exception_handler=ExceptionHandler())
 
 # start_time = get_time()
 work_dir = os.getcwd()
