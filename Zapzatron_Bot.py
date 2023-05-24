@@ -190,23 +190,27 @@ bot = telebot.TeleBot(os.environ["TELEGRAM_TOKEN"],
                       exception_handler=ExceptionHandler())
 # bot = telebot.TeleBot(os.environ["TEST_TELEGRAM_TOKEN"],
 #                       exception_handler=ExceptionHandler())
-start_time = get_time()
+
 work_dir = os.getcwd()
 data_dir = os.path.join(work_dir, "data")
 logs_dir = os.path.join(work_dir, "logs")
 
-logging(logs=f"[{start_time}] Бот включён :)",
-        write_file=True,
-        logs_dir_=logs_dir)
-logging(logs=f"Информация:\n"
-             f"  • Время: {start_time}\n"
-             f"  • Система: {platform.system()}\n"
-             f"  • Рабочая директория: {work_dir}\n"
-             f"  • Папка с данными: {data_dir}\n"
-             f"  • Папка с логами: {logs_dir}",
-        write_file=True,
-        logs_file_name=start_time[0:10],
-        logs_dir_=logs_dir)
+
+def run_info(work_dir, data_dir, logs_dir):
+    start_time = get_time()
+    logging(logs=f"[{start_time}] Бот включён :)",
+            write_file=True,
+            logs_dir_=logs_dir)
+    logging(logs=f"Информация:\n"
+                 f"  • Время: {start_time}\n"
+                 f"  • Система: {platform.system()}\n"
+                 f"  • Рабочая директория: {work_dir}\n"
+                 f"  • Папка с данными: {data_dir}\n"
+                 f"  • Папка с логами: {logs_dir}",
+            write_file=True,
+            logs_file_name=start_time[0:10],
+            logs_dir_=logs_dir)
+
 
 # Считывание OpenAI токена
 openai.api_key = read_file(f'{data_dir}/tokens.ini')[1][9:]
@@ -1599,6 +1603,7 @@ if __name__ == "__main__":
                     apihelper.proxy = proxy
                 else:
                     continue
+            run_info(work_dir, data_dir, logs_dir)
             # apihelper.proxy = {"http": "34.95.207.20:3129"}
             apihelper.RETRY_ON_ERROR = True
             bot.polling(skip_pending=True, logger_level=None)
