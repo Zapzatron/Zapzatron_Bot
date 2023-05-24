@@ -186,17 +186,31 @@ class ExceptionHandler(telebot.ExceptionHandler):
 
 nest_asyncio.apply()
 # Считывание токена телеграм бота и создание его.
-bot = telebot.TeleBot(os.environ["TELEGRAM_TOKEN"],
-                      exception_handler=ExceptionHandler())
-# bot = telebot.TeleBot(os.environ["TEST_TELEGRAM_TOKEN"],
+# bot = telebot.TeleBot(os.environ["TELEGRAM_TOKEN"],
 #                       exception_handler=ExceptionHandler())
+bot = telebot.TeleBot(os.environ["TEST_TELEGRAM_TOKEN"],
+                      exception_handler=ExceptionHandler())
 
+# start_time = get_time()
 work_dir = os.getcwd()
 data_dir = os.path.join(work_dir, "data")
 logs_dir = os.path.join(work_dir, "logs")
 
+# logging(logs=f"[{start_time}] Бот включён :)",
+#         write_file=True,
+#         logs_dir_=logs_dir)
+# logging(logs=f"Информация:\n"
+#              f"  • Время: {start_time}\n"
+#              f"  • Система: {platform.system()}\n"
+#              f"  • Рабочая директория: {work_dir}\n"
+#              f"  • Папка с данными: {data_dir}\n"
+#              f"  • Папка с логами: {logs_dir}",
+#         write_file=True,
+#         logs_file_name=start_time[0:10],
+#         logs_dir_=logs_dir)
 
-def run_info(work_dir, data_dir, logs_dir):
+
+def run_bot(work_dir, data_dir, logs_dir):
     start_time = get_time()
     logging(logs=f"[{start_time}] Бот включён :)",
             write_file=True,
@@ -210,10 +224,19 @@ def run_info(work_dir, data_dir, logs_dir):
             write_file=True,
             logs_file_name=start_time[0:10],
             logs_dir_=logs_dir)
+    country = get_ip_info(url_to_check_ip="http://ipinfo.io/json")["country"]
+    isproxyfound = True
+    if not country or country == "Russia" or country == "RU":
+        proxy = get_proxy(last_proxy)
+        if proxy:
+            apihelper.proxy = proxy
+        else:
+            isproxyfound = False
+    return isproxyfound
 
 
 # Считывание OpenAI токена
-openai.api_key = read_file(f'{data_dir}/tokens.ini')[1][9:]
+# openai.api_key = read_file(f'{data_dir}/tokens.ini')[1][9:]
 
 bot.set_my_commands([
     telebot.types.BotCommand("/menu", "Вызвать меню бота"),
@@ -226,19 +249,19 @@ bot.set_my_commands([
 # Словарь для проверки на спам
 user_use_dict = {}
 # Считывание списка разрешённых пользователей (телеграмм id)
-ALLOWED_USERS = read_file(f"{data_dir}/allowed_users.ini", ", ")
+# ALLOWED_USERS = read_file(f"{data_dir}/allowed_users.ini", ", ")
 # Интервал 5 минут между проверками разрешённых пользователей
-ALLOWED_USERS_CHECK_INTERVAL = datetime.timedelta(minutes=5)
+# ALLOWED_USERS_CHECK_INTERVAL = datetime.timedelta(minutes=5)
 # Время обновления списка разрешённых пользователей
-ALLOWED_USERS_CHECK_TIME = get_time(strp=True)
+# ALLOWED_USERS_CHECK_TIME = get_time(strp=True)
 # Выбор модели ИИ
-MODELS_GPT = "text-davinci-003"
+# MODELS_GPT = "text-davinci-003"
 # Максимальная длина для сообщения телеграмм
 MAX_MESSAGE_LENGTH = 4096
 # Создание кэша для хранения контекста запроса
-hot_cache = {}
+# hot_cache = {}
 # Время актуальности кэша
-HOT_CACHE_DURATION = datetime.timedelta(minutes=30)
+# HOT_CACHE_DURATION = datetime.timedelta(minutes=30)
 # Имя базы данных для запросов AI
 context_db = "context.db"
 # Имя базы данных для просмотра запросов пользователей
@@ -288,30 +311,30 @@ def is_spam(message, use_interval: datetime.timedelta = datetime.timedelta(secon
             return True
 
 
-def check_allowed_users():
-    global ALLOWED_USERS_CHECK_TIME
-    allowed_users_check_time_now = get_time(strp=True)
-    if allowed_users_check_time_now - ALLOWED_USERS_CHECK_TIME > ALLOWED_USERS_CHECK_INTERVAL:
-        global ALLOWED_USERS
-        ALLOWED_USERS = read_file(f"{data_dir}/allowed_users.ini", ", ")
-        ALLOWED_USERS_CHECK_TIME = get_time(strp=True)
-
-
-def restricted_access(func):
-    def wrapper(message):
-        user_id = message.from_user.id
-        check_allowed_users()
-        if str(user_id) in ALLOWED_USERS:
-            return func(message)
-        else:
-            logging(logs=f"[{get_time()}] "
-                         f"Id: {message.from_user.id} Fn: {message.from_user.first_name} "
-                         f"Ln: {message.from_user.last_name} Do: {'Отказано в доступе.'}",
-                    write_file=True,
-                    logs_dir_=logs_dir)
-            bot.reply_to(message, f"У тебя нет доступа к этой команде.")
-
-    return wrapper
+# def check_allowed_users():
+#     global ALLOWED_USERS_CHECK_TIME
+#     allowed_users_check_time_now = get_time(strp=True)
+#     if allowed_users_check_time_now - ALLOWED_USERS_CHECK_TIME > ALLOWED_USERS_CHECK_INTERVAL:
+#         global ALLOWED_USERS
+#         ALLOWED_USERS = read_file(f"{data_dir}/allowed_users.ini", ", ")
+#         ALLOWED_USERS_CHECK_TIME = get_time(strp=True)
+#
+#
+# def restricted_access(func):
+#     def wrapper(message):
+#         user_id = message.from_user.id
+#         check_allowed_users()
+#         if str(user_id) in ALLOWED_USERS:
+#             return func(message)
+#         else:
+#             logging(logs=f"[{get_time()}] "
+#                          f"Id: {message.from_user.id} Fn: {message.from_user.first_name} "
+#                          f"Ln: {message.from_user.last_name} Do: {'Отказано в доступе.'}",
+#                     write_file=True,
+#                     logs_dir_=logs_dir)
+#             bot.reply_to(message, f"У тебя нет доступа к этой команде.")
+#
+#     return wrapper
 
 
 def gen_markup(buttons_list, buttons_dest="auto", markup_type="Reply", callback_list=None, url=None, url_text=None):
@@ -1503,6 +1526,10 @@ def get_command_text(message):
     text = message.text
     cur_time = get_time(strp=True)
     # print(message)
+
+    if cur_time - datetime.datetime.utcfromtimestamp(message.date) > datetime.timedelta(seconds=0):
+        return
+
     message_2 = {"chat_id": message.chat.id,
                  "message_id": message.id,
                  "user_id": user_id,
@@ -1596,16 +1623,16 @@ if __name__ == "__main__":
                         write_file=True,
                         logs_dir_=logs_dir)
                 break
-            country = get_ip_info(url_to_check_ip="http://ipinfo.io/json")["country"]
-            if not country or country == "Russia" or country == "RU":
-                proxy = get_proxy(last_proxy)
-                if proxy:
-                    apihelper.proxy = proxy
-                else:
-                    continue
-            run_info(work_dir, data_dir, logs_dir)
+            # country = get_ip_info(url_to_check_ip="http://ipinfo.io/json")["country"]
+            # if not country or country == "Russia" or country == "RU":
+            #     proxy = get_proxy(last_proxy)
+            #     if proxy:
+            #         apihelper.proxy = proxy
+            #     else:
+            #         continue
             # apihelper.proxy = {"http": "34.95.207.20:3129"}
-            apihelper.RETRY_ON_ERROR = True
-            bot.polling(skip_pending=True, logger_level=None)
+            if run_bot(work_dir, data_dir, logs_dir):
+                apihelper.RETRY_ON_ERROR = True
+                bot.polling(logger_level=None)
         except Exception:
             handle_exception()
