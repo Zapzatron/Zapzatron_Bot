@@ -723,7 +723,7 @@ def gpt_mindsdb(prompt, model, chat_context=None, max_context=20):
         if len(chat_context) >= max_context:
             chat_context.pop(0)
             chat_context.pop(0)
-
+        content = content.replace("'", '"').replace("\n", "/nl").replace("\\", "/")
         chat_context.append(user_prompt)
         chat_context.append({"role": "assistant", "content": content})
         return content, chat_context
@@ -737,6 +737,7 @@ gpt3_context = []
 def gpt3(message, command_name):
     # global hot_cache_gpt3
     global gpt3_context
+    global connection
     chat_id = message.chat.id
     user_id = message.from_user.id
     first_name = message.from_user.first_name
@@ -813,6 +814,13 @@ def gpt3(message, command_name):
             try:
                 response_text, gpt3_context = gpt_mindsdb(text, "gpt3", gpt3_context, max_context)
             except (pymysql.err.ProgrammingError, pymysql.err.OperationalError,):
+                connection = pymysql.connect(host='cloud.mindsdb.com',
+                                             user=os.environ["MINDSDB_USER"],
+                                             password=os.environ["MINDSDB_PASSWORD"],
+                                             db='mindsdb',
+                                             charset='utf8mb4',
+                                             cursorclass=pymysql.cursors.DictCursor,
+                                             connect_timeout=30)
                 response_text, gpt3_context = gpt_mindsdb(text, "gpt3", gpt3_context, max_context)
         while len(response_text) > 0:
             response_chunk = response_text[:MAX_MESSAGE_LENGTH]
@@ -832,6 +840,7 @@ gpt4_context = []
 def gpt4(message, command_name):
     # global hot_cache_gpt4
     global gpt4_context
+    global connection
     # print(gpt4_context)
     chat_id = message.chat.id
     user_id = message.from_user.id
@@ -930,6 +939,13 @@ def gpt4(message, command_name):
             try:
                 response_text, gpt4_context = gpt_mindsdb(text, "gpt4", gpt4_context, max_context)
             except (pymysql.err.ProgrammingError, pymysql.err.OperationalError, ):
+                connection = pymysql.connect(host='cloud.mindsdb.com',
+                                             user=os.environ["MINDSDB_USER"],
+                                             password=os.environ["MINDSDB_PASSWORD"],
+                                             db='mindsdb',
+                                             charset='utf8mb4',
+                                             cursorclass=pymysql.cursors.DictCursor,
+                                             connect_timeout=30)
                 response_text, gpt4_context = gpt_mindsdb(text, "gpt4", gpt4_context, max_context)
         # print(spend_tokens, len(gpt4_context[-1]["content"]), len(gpt4_context[-2]["content"]))
         # spend_tokens = int(spend_tokens) + len(gpt4_context[-1]["content"]) + len(gpt4_context[-2]["content"])
