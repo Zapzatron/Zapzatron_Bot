@@ -684,6 +684,15 @@ def gpt_openai(key, model, prompt, system_message_="", chat_context=None,
     return content
 
 
+connection = pymysql.connect(host='cloud.mindsdb.com',
+                             user=os.environ["MINDSDB_USER"],
+                             password=os.environ["MINDSDB_PASSWORD"],
+                             db='mindsdb',
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor,
+                             connect_timeout=30)
+
+
 def gpt_mindsdb(prompt, model, chat_context=None, max_context=20):
     user_prompt = {"role": "user", "content": prompt}
     chat = ''
@@ -699,13 +708,13 @@ def gpt_mindsdb(prompt, model, chat_context=None, max_context=20):
 
     sql = f"SELECT response FROM mindsdb.{model} WHERE text='{chat}'"
 
-    connection = pymysql.connect(host='cloud.mindsdb.com',
-                                 user=os.environ["MINDSDB_USER"],
-                                 password=os.environ["MINDSDB_PASSWORD"],
-                                 db='mindsdb',
-                                 charset='utf8mb4',
-                                 cursorclass=pymysql.cursors.DictCursor,
-                                 connect_timeout=30)
+    # connection = pymysql.connect(host='cloud.mindsdb.com',
+    #                              user=os.environ["MINDSDB_USER"],
+    #                              password=os.environ["MINDSDB_PASSWORD"],
+    #                              db='mindsdb',
+    #                              charset='utf8mb4',
+    #                              cursorclass=pymysql.cursors.DictCursor,
+    #                              connect_timeout=30)
     cursor = connection.cursor()
     cursor.execute(sql)
     response = cursor.fetchone()
@@ -882,7 +891,7 @@ def gpt4(message, command_name):
         tokens = read_file("data/gpt-4.ini")
         system_message = "Ты GPT-4, большая языковая модель созданная OpenAI, отвечающая кратко точно по теме."
         temperature = 0.5
-        max_tokens = 6500
+        max_tokens = 5500
         max_context = 2
         if tokens[-1] == "":
             tokens.pop(-1)
