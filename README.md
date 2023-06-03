@@ -5,10 +5,10 @@ Access to GPT, voice ↔ text, generate Russian words from letters, download fil
 
 ----------------------------------------
 
-Feel free to join us:
-[Telegram Channel](https://t.me/Zapzatron_Bot_Channel) Here you can see Zapzatron Bot news :)
-[Telegram Chat](https://t.me/+NkT96igVJ180NTQy): Here you can send bug reports, suggestions or just chat :)
-Support email: 6564degget6564@gmail.com
+Feel free to join us:  
+[Telegram Channel](https://t.me/Zapzatron_Bot_Channel) Here you can see Zapzatron Bot news :)  
+[Telegram Chat](https://t.me/+NkT96igVJ180NTQy): Here you can send bug reports, suggestions or just chat :)  
+Support email: 6564degget6564@gmail.com  
 
 ----------------------------------------
 
@@ -17,17 +17,17 @@ Support email: 6564degget6564@gmail.com
 ----------------------------------------
 ## Documentation
 
-1. Go to the [Zapzatron bot](https://t.me/Zapzatron_Bot).
-2. Call /menu.
+1. Go to the [Zapzatron bot](https://t.me/Zapzatron_Bot).  
+2. Call /menu.  
 
 ## Support
 
-If you found a bug, please submit an [issue on GitHub](https://github.com/Zapzatron/Zapzatron_Bot/issues/new/choose).
+If you found a bug, please submit an [issue on GitHub](https://github.com/Zapzatron/Zapzatron_Bot/issues/new/choose).  
 
-To get community support, you can:
+To get community support, you can:  
 
-* Ask at our [Telegram Chat](https://t.me/+NkT96igVJ180NTQy).
-* Ask for help at our [GitHub Discussions](https://github.com/Zapzatron/Zapzatron_Bot/discussions).
+* Ask at our [Telegram Chat](https://t.me/+NkT96igVJ180NTQy).  
+* Ask for help at our [GitHub Discussions](https://github.com/Zapzatron/Zapzatron_Bot/discussions).  
 
 ### Contributors
 
