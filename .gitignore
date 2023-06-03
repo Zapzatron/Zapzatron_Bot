@@ -5,5 +5,10 @@ temp
 data/*
 tests
 Zapzatron_Bot_Test.py
+Zapzatron_Bot.py
+___Zapzatron_Bot_Async.py
+Zapzatron_Bot_WebHook.py
 !data/requirements.txt
 !data/russian_nouns_without_io.txt
+!data/TipsQRCode.png
+!data/Zapzatron_Bot_QR.png
