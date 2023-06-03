@@ -31,7 +31,7 @@ To get community support, you can:
 
 ### Contributors
 
-<a href="https://github.com/mindsdb/mindsdb/graphs/contributors">
+<a href="https://github.com/Zapzatron/Zapzatron_Bot/graphs/contributors">
   <img src="https://contributors-img.web.app/image?repo=Zapzatron/Zapzatron_Bot" />
 </a>
 
