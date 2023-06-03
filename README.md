@@ -39,4 +39,4 @@ Made with [contributors-img](https://contributors-img.web.app).
 
 ## License
 
-Zapzatron Bot is licensed under [MIT License](https://github.com/Zapzatron/Zapzatron_Bot/raw/main/LICENSES/Zapzatron_LICENSE)
+Zapzatron Bot is licensed under [MIT License](https://github.com/Zapzatron/Zapzatron_Bot/blob/main/LICENSES/Zapzatron_LICENSE)
