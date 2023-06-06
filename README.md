@@ -29,7 +29,7 @@ To get community support, you can:
 * Ask at our [Telegram Chat](https://t.me/+NkT96igVJ180NTQy).  
 * Ask for help at our [GitHub Discussions](https://github.com/Zapzatron/Zapzatron_Bot/discussions).  
 
-### Contributors
+## Contributors
 
 <a href="https://github.com/Zapzatron/Zapzatron_Bot/graphs/contributors">
   <img src="https://contributors-img.web.app/image?repo=Zapzatron/Zapzatron_Bot" />

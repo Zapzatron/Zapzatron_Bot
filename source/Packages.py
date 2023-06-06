@@ -6,7 +6,7 @@ from importlib import import_module
 import importlib
 
 
-def check_req_packages(packages):
+def check_req_packages(packages, show_package_info=False):
     checking_package = ""
     try:
         for package in packages:
@@ -23,14 +23,14 @@ def check_req_packages(packages):
                 subprocess.run([package], capture_output=True, text=True)
             else:
                 # print(package, checking_package)
-                import_module(package)
+                importlib.reload(import_module(package))
                 if "==" in packages[package]:
                     temp = packages[package].split("==")
                     importlib.reload(pkg_resources)
                     version = pkg_resources.get_distribution(temp[0]).version
-                    # print(package)
-                    # print(version, temp[1])
                     if version != temp[1]:
+                        if show_package_info:
+                            print(f"Name: {package}; Current: {version}; Need: {temp[1]}")
                         raise ModuleNotFoundError
 
         for package in packages:
