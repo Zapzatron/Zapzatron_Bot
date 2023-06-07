@@ -8,7 +8,7 @@ packages = {
     "gtts": "gTTS==2.3.2",
     "openai": "openai==0.27.0",
     "aiohttp": "aiohttp==3.8.4",
-    "EdgeGPT": "EdgeGPT==0.10.3",
+    "EdgeGPT": "EdgeGPT==0.10.4",
     "pandas": "pandas==1.3.5",
     "mindsdb_sdk": "mindsdb-sdk==1.0.2",
     "pymysql": "PyMySQL==1.0.3",
@@ -28,14 +28,14 @@ Packages.check_req_packages(packages, True)
 print("Required packages checked.")
 print("-" * 27)
 
-from io import BytesIO  # Используется для работы с бинарными потоками данных в памяти
+from io import BufferedReader, BytesIO  # Используется для работы с бинарными потоками данных в памяти
 import signal  # Используется для обработки сигналов от операционной системы
 import data.config as config  # Используется для импорта данных конфигурации из локального файла
 from telebot.async_telebot import AsyncTeleBot  # Используется для создания асинхронного экземпляра класса TeleBot
-from telebot import formatting
+# from telebot import formatting
 from aiohttp import web  # Используется для создания HTTP-сервера и клиента с помощью asyncio
 # import mindsdb_sdk # Используется для работы с MindsDB SDK
-import atexit  # Используется для регистрации функций, которые будут вызваны при выходе из программы
+# import atexit  # Используется для регистрации функций, которые будут вызваны при выходе из программы
 import datetime  # Используется для работы с датами и временем
 import os  # Используется для взаимодействия с операционной системой
 import io  # Используется для работы с потоками данных
@@ -43,7 +43,7 @@ import json  # Используется для кодирования и дек�
 import platform  # Используется для получения информации о текущей платформе
 import shutil  # Используется для высокоуровневых файловых операций
 # import sqlite3 # Используется для работы с базами данных SQLite
-import threading  # Используется для работы с потоками
+# import threading  # Используется для работы с потоками
 import time  # Используется для работы с функциями, связанными со временем
 import zipfile  # Используется для работы с архивами ZIP
 from datetime import datetime as dt  # Используется для создания объектов datetime из строк или чисел
@@ -78,6 +78,12 @@ def read_file(file_name, split_symbol="\n"):
     """
     with open(file_name, 'r') as file:
         return file.read().split(split_symbol)
+
+
+class CustomBytesIO(BytesIO):
+    def __init__(self, *args, **kwargs):
+        self.name = "result.txt"
+        super().__init__(*args, **kwargs)
 
 
 async def logging(logs: str, print_logs: bool = True, write_file: bool = False,
@@ -128,7 +134,7 @@ async def logging(logs: str, print_logs: bool = True, write_file: bool = False,
             if len(logs) < MAX_MESSAGE_LENGTH:
                 await bot.send_message(config.TELEGRAM_LOGS_CHANNEL, logs)
             else:
-                await bot.send_document(config.TELEGRAM_LOGS_CHANNEL, BytesIO(logs.encode('utf-8')))
+                await bot.send_document(config.TELEGRAM_LOGS_CHANNEL, BufferedReader(CustomBytesIO(logs.encode('utf-8'))))
                 # temp_logs_file = f"{temp_dir}/logs/{logs[1:19]}.txt"
                 # with open(temp_logs_file, "w", encoding="utf-8") as f:
                 #     f.write(logs)
@@ -751,7 +757,8 @@ async def gpt3(message, command_name):
                 # await bot.reply_to(message, formatting.escape_markdown(response_text), parse_mode='Markdown')
                 await bot.reply_to(message, response_text)
         else:
-            await bot.send_document(config.TELEGRAM_LOGS_CHANNEL, BytesIO(response_text.encode('utf-8')))
+            # await bot.send_document(chat_id, BytesIO(response_text.encode('utf-8')))
+            await bot.send_document(chat_id, BufferedReader(CustomBytesIO(response_text.encode('utf-8'))))
 
         # while len(response_text) > 0:
         #     response_chunk = response_text[:MAX_MESSAGE_LENGTH]
@@ -776,6 +783,7 @@ gpt4_context = []
 
 async def gpt4(message, command_name):
     global gpt4_context
+    # print(gpt4_context)
     chat_id = message.chat.id
     user_id = message.from_user.id
     first_name = message.from_user.first_name
@@ -874,7 +882,8 @@ async def gpt4(message, command_name):
                 # await bot.reply_to(message, formatting.escape_markdown(response_text), parse_mode='Markdown')
                 await bot.reply_to(message, response_text)
         else:
-            await bot.send_document(config.TELEGRAM_LOGS_CHANNEL, BytesIO(response_text.encode('utf-8')))
+            # await bot.send_document(chat_id, BytesIO(response_text.encode('utf-8')))
+            await bot.send_document(chat_id, BufferedReader(CustomBytesIO(response_text.encode('utf-8'))))
         # while len(response_text) > 0:
         #     response_chunk = response_text[:MAX_MESSAGE_LENGTH]
         #     response_text = response_text[MAX_MESSAGE_LENGTH:]
@@ -951,7 +960,8 @@ async def bing(message, command_name):
                 # await bot.reply_to(message, formatting.escape_markdown(response_text), parse_mode='Markdown')
                 await bot.reply_to(message, response_text)
         else:
-            await bot.send_document(config.TELEGRAM_LOGS_CHANNEL, BytesIO(response_text.encode('utf-8')))
+            # await bot.send_document(chat_id, BytesIO(response_text.encode('utf-8')))
+            await bot.send_document(chat_id, BufferedReader(CustomBytesIO(response_text.encode('utf-8'))))
         # while len(response_text) > 0:
         #     response_chunk = response_text[:MAX_MESSAGE_LENGTH]
         #     response_text = response_text[MAX_MESSAGE_LENGTH:]
@@ -1160,15 +1170,19 @@ async def text_to_voice(message, command_name):
                        f"Ln: {last_name} Do: {command_name}",
                   write_file=True,
                   logs_dir_=logs_dir)
-    output_dir = f"temp/{user_id}/voice_text"
-
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    # output_dir = f"temp/{user_id}/voice_text"
+    #
+    # if not os.path.exists(output_dir):
+    #     os.makedirs(output_dir)
 
     try:
-        gTTS(text=message.text, lang='ru').save(f"{output_dir}/voice_{user_id}.mp3")
-        await bot.send_audio(message.chat.id, open(f"{output_dir}/voice_{user_id}.mp3", 'rb'))
-        os.remove(f"{output_dir}/voice_{user_id}.mp3")
+        audio_data = BytesIO()
+        gTTS(text=message.text, lang='ru').write_to_fp(audio_data)
+        audio_data.seek(0)
+        # gTTS(text=message.text, lang='ru').save(f"{output_dir}/voice_{user_id}.mp3")
+        # await bot.send_audio(message.chat.id, open(f"{output_dir}/voice_{user_id}.mp3", 'rb'))
+        await bot.send_audio(message.chat.id, audio_data)
+        # os.remove(f"{output_dir}/voice_{user_id}.mp3")
     except Exception:
         # await handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
         await handle_exception({"time_text": time_text, "chat_id": chat_id, "id": user_id,
@@ -1536,15 +1550,15 @@ async def stop_bot(message):
         os.kill(os.getpid(), signal.SIGTERM)
 
 
-##########################
-##########################
+#################################
+#################################
 is_production = False
 is_webhook = False
-##########################
-##########################
+#################################
+#################################
 is_production_auto_check = True
-##########################
-##########################
+#################################
+#################################
 
 
 if is_production_auto_check and config.IS_PRODUCTION:
@@ -1590,7 +1604,7 @@ asyncio.run(bot.set_my_commands([
     telebot.types.BotCommand("/gpt4", "GPT-4"),
     telebot.types.BotCommand("/gpt3", "GPT-3"),
     telebot.types.BotCommand("/bing", "Bing AI"),
-    telebot.types.BotCommand("/chat_mode", "Отключает отправку 'Запрос отправлен...'"),
+    telebot.types.BotCommand("/chat_mode", "Отключает/меняет отправку лишних сообщений"),
     telebot.types.BotCommand("/voice_to_text", "Голос в текст"),
     telebot.types.BotCommand("/text_to_voice", "Текст в голос"),
 ]))
@@ -1720,7 +1734,7 @@ async def get_command_text(message):
                  "last_name": last_name,
                  "text": text}
     # print(text)
-    if message.content_type == "text" and text != "/menu" and text != "/donation":
+    if message.content_type == "text" and text != "/menu" and text != "/donation" and text != "/start":
         try:
             if (await bot.get_chat_member(config.TELEGRAM_ADS_CHANNEL, user_id)).status == "left":
                 markup = telebot.types.InlineKeyboardMarkup()
