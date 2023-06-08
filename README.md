@@ -12,7 +12,7 @@ Support email: zapzatron.bot.help@gmail.com
 
 ----------------------------------------
 
-[Documentation](https://github.com/Zapzatron/Zapzatron_Bot#documentation) - [Support](https://github.com/Zapzatron/Zapzatron_Bot#support) - [Contributors](https://github.com/Zapzatron/Zapzatron_Bot#contributors) - [License](https://github.com/mindsdb/mindsdb#license)
+[Documentation](https://github.com/Zapzatron/Zapzatron_Bot#documentation) - [Support](https://github.com/Zapzatron/Zapzatron_Bot#support) - [Contributors](https://github.com/Zapzatron/Zapzatron_Bot#contributors) - [License](https://github.com/Zapzatron/Zapzatron_Bot#license)
 
 ----------------------------------------
 ## Documentation
