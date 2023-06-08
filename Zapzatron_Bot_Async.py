@@ -5,6 +5,7 @@
 import source.Packages as Packages
 
 packages = {
+    "pip": "pip==23.1.2",
     "gtts": "gTTS==2.3.2",
     "openai": "openai==0.27.0",
     "aiohttp": "aiohttp==3.8.4",
@@ -27,6 +28,27 @@ print("Checking required packages.")
 Packages.check_req_packages(packages, True)
 print("Required packages checked.")
 print("-" * 27)
+
+
+# import time
+# from importlib import import_module
+# start_cur = time.time()
+# count_time = 0
+
+# def check_import_time(packages):
+#     print(f"{len(packages)} пакетов отправлено на проверку.")
+#     for i in range(len(packages)):
+#         start = time.time()
+#         import_module(packages[i])
+#         print(f"{packages[i]} занял {time.time() - start} секунд.")
+#
+#
+# packages_imp = ["io", "signal", "data.config", "telebot", "aiohttp", "datetime", "os", "io", "json", "platform",
+#                 "shutil", "time", "zipfile", "datetime", "urllib.parse", "pymysql.cursors", "aiomysql", "openai",
+#                 "gtts", "pytz", "requests", "traceback", "EdgeGPT.EdgeGPT", "asyncio", "nest_asyncio", "re",
+#                 "aiosqlite", "aiohttp"]
+# check_import_time(packages_imp)
+
 
 from io import BufferedReader, BytesIO  # Используется для работы с бинарными потоками данных в памяти
 import signal  # Используется для обработки сигналов от операционной системы
@@ -67,6 +89,10 @@ import aiosqlite  # Используются для создания асинх�
 import aiohttp  # Используется для создания асинхронного HTTP-клиента
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 def read_file(file_name, split_symbol="\n"):
     """
     Эта функция считывает содержимое файла с именем `file_name`
@@ -80,10 +106,18 @@ def read_file(file_name, split_symbol="\n"):
         return file.read().split(split_symbol)
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 class CustomBytesIO(BytesIO):
     def __init__(self, *args, **kwargs):
         self.name = "result.txt"
         super().__init__(*args, **kwargs)
+
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 
 async def logging(logs: str, print_logs: bool = True, write_file: bool = False,
@@ -148,23 +182,27 @@ async def logging(logs: str, print_logs: bool = True, write_file: bool = False,
     except Exception:
         pass
 
-    if write_file:
-        if not os.path.exists(logs_dir_):
-            os.makedirs(logs_dir_)
+    # if write_file:
+    #     if not os.path.exists(logs_dir_):
+    #         os.makedirs(logs_dir_)
+    #
+    #     if logs_file_name is None:
+    #         logs_file_name = f"{logs_dir_}/{logs[1:11]}.txt"
+    #     else:
+    #         logs_file_name = f"{logs_dir_}/{logs_file_name}.txt"
+    #
+    #     if os.path.exists(logs_file_name):
+    #         with open(logs_file_name, 'r', encoding='utf-8') as logs_file:
+    #             previous_text = logs_file.read()
+    #         with open(logs_file_name, 'w', encoding='utf-8') as logs_file:
+    #             logs_file.write(previous_text + logs + "\n")
+    #     else:
+    #         with open(logs_file_name, 'w', encoding='utf-8') as logs_file:
+    #             logs_file.write(logs + "\n")
 
-        if logs_file_name is None:
-            logs_file_name = f"{logs_dir_}/{logs[1:11]}.txt"
-        else:
-            logs_file_name = f"{logs_dir_}/{logs_file_name}.txt"
 
-        if os.path.exists(logs_file_name):
-            with open(logs_file_name, 'r', encoding='utf-8') as logs_file:
-                previous_text = logs_file.read()
-            with open(logs_file_name, 'w', encoding='utf-8') as logs_file:
-                logs_file.write(previous_text + logs + "\n")
-        else:
-            with open(logs_file_name, 'w', encoding='utf-8') as logs_file:
-                logs_file.write(logs + "\n")
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 
 def get_time(tz: str | None = 'Europe/Moscow', form: str = '%d-%m-%Y %H:%M:%S', strp: bool = False):
@@ -191,6 +229,10 @@ def get_time(tz: str | None = 'Europe/Moscow', form: str = '%d-%m-%Y %H:%M:%S', 
             return dt.now(ptz.timezone(tz)).strftime(form)
         else:
             return dt.now().strftime(form)
+
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 
 async def handle_exception(message=None, extra_text=None):
@@ -235,6 +277,10 @@ async def handle_exception(message=None, extra_text=None):
     print("-" * 120)
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 class ExceptionHandler(telebot.ExceptionHandler):
     """
     Класс ExceptionHandler наследует от telebot.ExceptionHandler и переопределяет метод handle,
@@ -255,8 +301,16 @@ class ExceptionHandler(telebot.ExceptionHandler):
         return True
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 # Позволяет запускать асинхронные функции (asyncio) внутри синхронных функций, используя один и тот же цикл событий.
 nest_asyncio.apply()
+
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 
 async def is_spam(message, use_interval: datetime.timedelta = datetime.timedelta(seconds=30), command_name=None):
@@ -299,6 +353,10 @@ async def is_spam(message, use_interval: datetime.timedelta = datetime.timedelta
                           write_file=True,
                           logs_dir_=logs_dir)
             return True
+
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 
 async def gen_markup(buttons_list, buttons_dest="auto", markup_type="Reply", callback_list=None, url=None,
@@ -369,6 +427,10 @@ async def gen_markup(buttons_list, buttons_dest="auto", markup_type="Reply", cal
     return markup
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 # thread_local = threading.local()
 
 
@@ -434,6 +496,9 @@ async def work_with_db(db_path, sql, params=None, host="", user="", password="")
             return rows
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
 # def close_db():
 #     con = getattr(thread_local, "con", None)
 #     if con is not None:
@@ -488,6 +553,10 @@ async def commands(message):
     return commands_text
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 async def about_us(message):
     chat_id = message["chat_id"]
     text = message["text"]
@@ -513,6 +582,10 @@ async def about_us(message):
     return about_us_text
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 async def donation(message):
     chat_id = message["chat_id"]
     user_id = message["user_id"]
@@ -533,6 +606,10 @@ async def donation(message):
            "А разработчик активно трудится для вас."
     markup.add(telebot.types.InlineKeyboardButton(text=button_text, url=url))
     await bot.send_photo(chat_id, photo, caption=text, reply_markup=markup)
+
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 
 async def gpt_help(message):
@@ -565,6 +642,10 @@ async def gpt_help(message):
     return gpt_help_text
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 async def gpt_openai(key, model, prompt, system_message_="", chat_context=None,
                      temperature=1.0, max_tokens=2000, max_context=20):
     # print(f"{key}")
@@ -593,6 +674,10 @@ async def gpt_openai(key, model, prompt, system_message_="", chat_context=None,
         chat_context.append({"role": "assistant", "content": temp})
         return content, chat_context
     return content
+
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 
 async def gpt_mindsdb(prompt, model, chat_context=None, max_context=20):
@@ -672,6 +757,9 @@ async def gpt_mindsdb(prompt, model, chat_context=None, max_context=20):
         return content, chat_context
     return content
 
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 gpt3_context = []
 
@@ -777,6 +865,9 @@ async def gpt3(message, command_name):
         else:
             await bot.reply_to(message, f"Задай другой вопрос или спроси позже, не хочу общаться на эту тему сейчас.")
 
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 gpt4_context = []
 
@@ -901,6 +992,10 @@ async def gpt4(message, command_name):
             await bot.reply_to(message, f"Задай другой вопрос или спроси позже, не хочу общаться на эту тему сейчас.")
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 async def bing_chat(prompt):
     cookies = json.loads(open(f"{data_dir}/cookies.json", encoding="utf-8").read())
     gbot = await Chatbot().create(cookies=cookies)
@@ -916,6 +1011,9 @@ async def bing_chat(prompt):
     content = content.replace(r"**", r"*")
     return content
 
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 bing_context = []
 
@@ -981,6 +1079,10 @@ async def bing(message, command_name):
             await bot.reply_to(message, f"Задай другой вопрос или спроси позже, не хочу общаться на эту тему сейчас.")
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 async def voice_text_help(message):
     chat_id = message["chat_id"]
     text = message["text"]
@@ -1009,6 +1111,10 @@ async def voice_text_help(message):
     return voice_text_text
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 async def voice_to_text_hf(data, voice_to_text_model, api_token):
     async with aiohttp.ClientSession() as session:
         headers = {"Authorization": f"Bearer {api_token}"}
@@ -1019,6 +1125,10 @@ async def voice_to_text_hf(data, voice_to_text_model, api_token):
             response_data = response_content.decode("utf-8")
             response_json = json.loads(response_data)
             return response_json
+
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 
 async def en_to_ru_hf(en_text, en_to_ru_model, api_token):
@@ -1033,6 +1143,9 @@ async def en_to_ru_hf(en_text, en_to_ru_model, api_token):
             response_json = json.loads(response_data)
             return response_json
 
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 # whisper_model = whisper.load_model("base")
 
@@ -1159,6 +1272,10 @@ async def voice_to_text(message, command_name):
         await bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже. \n")
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 async def text_to_voice(message, command_name):
     chat_id = message.chat.id
     user_id = message.from_user.id
@@ -1190,6 +1307,10 @@ async def text_to_voice(message, command_name):
         await bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже. \n")
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 async def user_info(message):
     chat_id = message.chat.id
     user_id = message.from_user.id
@@ -1209,6 +1330,10 @@ async def user_info(message):
                                 f"    • Имя: {first_name}\n"
                                 f"    • Фамилия: {last_name}\n"
                                 f"    • Система: {platform.system()}")
+
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 
 async def gen_words_help(message):
@@ -1235,6 +1360,9 @@ async def gen_words_help(message):
         await bot.send_message(chat_id, gen_words_help_text)
     return gen_words_help_text
 
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 gen_words_letters = ""
 gen_words_length = 0
@@ -1304,6 +1432,10 @@ async def gen_words(message, command_name):
     gen_words_length = 0
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 async def get_app_help(message):
     chat_id = message["chat_id"]
     text = message["text"]
@@ -1332,6 +1464,10 @@ async def get_app_help(message):
     if text == "/get_app_help":
         await bot.send_message(chat_id, get_app_help_text)
     return get_app_help_text
+
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 
 async def get_app(message):
@@ -1428,6 +1564,10 @@ async def get_app(message):
     clear_folder(extract_path)
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 async def get_file_help(message):
     chat_id = message["chat_id"]
     text = message["text"]
@@ -1451,6 +1591,10 @@ async def get_file_help(message):
     if text == "/get_file_help":
         await bot.send_message(chat_id, get_file_help_text)
     return get_file_help_text
+
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 
 async def get_file(message, command_name):
@@ -1497,6 +1641,10 @@ async def get_file(message, command_name):
     clear_folder(temp_path)
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 async def menu(message, first=True):
     buttons_list = ["GPT 🤖", "Голос ↔ Текст", "Генератор слов", "Приложение",
                     "Ссылка ⬇︎ Файл", "Команды 🔍", "О нас ℹ︎"]
@@ -1522,11 +1670,14 @@ async def menu(message, first=True):
                                     disable_web_page_preview=True)
 
 
-is_stop_bot = False
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+# is_stop_bot = False
 
 
 async def stop_bot(message):
-    global is_stop_bot
+    # global is_stop_bot
     if message.from_user.id in config.ADMINS_LIST:
         chat_id = message.chat.id
         user_id = message.from_user.id
@@ -1540,7 +1691,7 @@ async def stop_bot(message):
                       write_file=True,
                       logs_dir_=logs_dir)
         await bot.reply_to(message, f"Останавливаю бота...")
-        is_stop_bot = True
+        # is_stop_bot = True
         if is_webhook:
             asyncio.run(bot.delete_webhook())
             asyncio.run(app.shutdown())
@@ -1549,6 +1700,9 @@ async def stop_bot(message):
                             logs_dir_=logs_dir))
         os.kill(os.getpid(), signal.SIGTERM)
 
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 #################################
 #################################
@@ -1579,6 +1733,10 @@ if is_webhook:
     app = web.Application()
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 async def handle(request):
     if str(request.message.url)[5:] == bot.token:
         update = telebot.types.Update.de_json(await request.json())
@@ -1591,6 +1749,9 @@ async def handle(request):
         return web.Response(status=403)
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
 if is_webhook:
     app.router.add_post(WEBHOOK_PATH, handle)
 
@@ -1599,7 +1760,14 @@ data_dir = os.path.join(work_dir, "data")
 logs_dir = os.path.join(work_dir, "logs")
 temp_dir = os.path.join(work_dir, "temp")
 
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# print("Дальше тормознутый элемент")
+# start_cur = time.time()
+
+
 asyncio.run(bot.set_my_commands([
+    telebot.types.BotCommand("/start", "Перезапуск чата с ботом (не удаляет ничего)"),
     telebot.types.BotCommand("/menu", "Вызвать меню бота"),
     telebot.types.BotCommand("/gpt4", "GPT-4"),
     telebot.types.BotCommand("/gpt3", "GPT-3"),
@@ -1608,6 +1776,9 @@ asyncio.run(bot.set_my_commands([
     telebot.types.BotCommand("/voice_to_text", "Голос в текст"),
     telebot.types.BotCommand("/text_to_voice", "Текст в голос"),
 ]))
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 # Разрешённое время между сообщениями (в секундах)
 timeout_messages = 10
@@ -1637,6 +1808,9 @@ actions_text = {
 }
 gpt_context_duration = datetime.timedelta(hours=2)
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
 # work_with_db(context_db, data_dir,
 #              '''CREATE TABLE IF NOT EXISTS [name]
 #              (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, text TEXT, time DATETIME)''')
@@ -1656,6 +1830,9 @@ asyncio.run(work_with_db(f"{data_dir}/{user_prompts_db}",
 asyncio.run(work_with_db(f"{data_dir}/{user_data_db}",
                          '''CREATE TABLE IF NOT EXISTS [name]
                          (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, fn TEXT, ln TEXT, start_in_Moscow TEXT)'''))
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 
 @bot.callback_query_handler(func=lambda message: True)
@@ -1707,6 +1884,10 @@ async def callback_buttons(message):
         await menu(message_2, first=False)
     elif text == "/subscribe_ads_c":
         pass
+
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 
 @bot.message_handler(content_types=["text", "voice"])
@@ -1824,6 +2005,9 @@ async def get_command_text(message):
     # print(user_state)
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
 # atexit.register(close_db)
 
 
@@ -1845,6 +2029,10 @@ async def run_info():
                   logs_dir_=logs_dir)
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 async def run_webhook():
     webhook_info = await bot.get_webhook_info()
     if webhook_info.url != WEBHOOK_URL:
@@ -1855,14 +2043,23 @@ async def run_webhook():
     await site.start()
 
 
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
+
+
 def shutdown(signum, frame):
+    # global is_stop_bot
     asyncio.run(logging(logs=f"[{get_time()}] Бот выключен :(\n",
                         write_file=True,
                         logs_dir_=logs_dir))
+    # is_stop_bot = True
     if is_webhook:
         asyncio.run(bot.delete_webhook())
     os.kill(os.getpid(), signal.SIGTERM)
 
+
+# count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
+# start_cur = time.time()
 
 signal.signal(signal.SIGINT, shutdown)
 
@@ -1870,11 +2067,11 @@ signal.signal(signal.SIGINT, shutdown)
 if __name__ == "__main__":
     while True:
         try:
-            if is_stop_bot:
-                asyncio.run(logging(logs=f"[{get_time()}] Бот выключен :(\n",
-                                    write_file=True,
-                                    logs_dir_=logs_dir))
-                break
+            # if is_stop_bot:
+            #     # asyncio.run(logging(logs=f"[{get_time()}] Бот выключен :(\n",
+            #     #                     write_file=True,
+            #     #                     logs_dir_=logs_dir))
+            #     break
             asyncio.run(run_info())
             # asyncio_helper.proxy = {"http": "157.245.27.9:3128"}
             if is_webhook:
