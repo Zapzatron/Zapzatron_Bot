@@ -9,7 +9,7 @@ packages = {
     "gtts": "gTTS==2.3.2",
     "openai": "openai==0.27.0",
     "aiohttp": "aiohttp==3.8.4",
-    "EdgeGPT": "EdgeGPT==0.10.4",
+    "EdgeGPT": "EdgeGPT==0.10.14",  # 0.8.2 (Говорят работает, но не особо как-то)
     "pandas": "pandas==1.3.5",
     "mindsdb_sdk": "mindsdb-sdk==1.0.2",
     "pymysql": "PyMySQL==1.0.3",
@@ -23,12 +23,14 @@ packages = {
     "nest_asyncio": "nest_asyncio==1.5.6",
 }
 
+# import time
+# start_cur = time.time()
 print("-" * 27)
 print("Checking required packages.")
 Packages.check_req_packages(packages, True)
 print("Required packages checked.")
 print("-" * 27)
-
+# print(time.time() - start_cur)
 
 # import time
 # from importlib import import_module
@@ -82,6 +84,8 @@ import telebot  # Используется для создания экземп�
 import traceback  # Используется для печати или логирования трассировок стека исключений
 from EdgeGPT.EdgeGPT import Chatbot, \
     ConversationStyle  # Используются для создания экземпляров класса Chatbot и указания стилей разговора
+# from EdgeGPT import Chatbot, ConversationStyle
+# import EdgeGPT
 import asyncio  # Используется для асинхронного программирования с использованием корутин и циклов событий
 import nest_asyncio  # Используются для исправления asyncio, чтобы разрешить вложенные циклы событий
 import re  # Используются для работы с регулярными выражениями
@@ -111,8 +115,8 @@ def read_file(file_name, split_symbol="\n"):
 
 
 class CustomBytesIO(BytesIO):
-    def __init__(self, *args, **kwargs):
-        self.name = "result.txt"
+    def __init__(self, *args, filename, **kwargs):
+        self.name = filename
         super().__init__(*args, **kwargs)
 
 
@@ -168,7 +172,8 @@ async def logging(logs: str, print_logs: bool = True, write_file: bool = False,
             if len(logs) < MAX_MESSAGE_LENGTH:
                 await bot.send_message(config.TELEGRAM_LOGS_CHANNEL, logs)
             else:
-                await bot.send_document(config.TELEGRAM_LOGS_CHANNEL, BufferedReader(CustomBytesIO(logs.encode('utf-8'))))
+                await bot.send_document(config.TELEGRAM_LOGS_CHANNEL,
+                                        BufferedReader(CustomBytesIO(logs.encode('utf-8'), filename="result.txt")))
                 # temp_logs_file = f"{temp_dir}/logs/{logs[1:19]}.txt"
                 # with open(temp_logs_file, "w", encoding="utf-8") as f:
                 #     f.write(logs)
@@ -179,7 +184,8 @@ async def logging(logs: str, print_logs: bool = True, write_file: bool = False,
             #     response_chunk = temp[:MAX_MESSAGE_LENGTH]
             #     temp = temp[MAX_MESSAGE_LENGTH:]
             #     await bot.send_message(-1001957630208, response_chunk)
-    except Exception:
+    except Exception as e:
+        print(e)
         pass
 
     # if write_file:
@@ -262,7 +268,7 @@ async def handle_exception(message=None, extra_text=None):
         await logging(logs=f"\033[31m[{message['time_text']}] "
                            f"Chat Id: {message['chat_id']} "
                            f"Id: {message['id']} Fn: {message['fn']} "
-                           f"Ln: {message['ln']} Ошибка: \n{error}\033[0m",
+                           f"Ln: {message['ln']} Do: {message['command_name']} Ошибка: \n{error}\033[0m",
                       write_file=True,
                       logs_dir_=logs_dir)
     else:
@@ -296,7 +302,7 @@ class ExceptionHandler(telebot.ExceptionHandler):
     def handle(self, exception):
         if str(exception)[-68:] == "query is too old and response timeout expired or query ID is invalid":
             return True
-        print(exception)
+        # print(exception)
         asyncio.run(handle_exception())
         return True
 
@@ -468,16 +474,23 @@ async def work_with_db(db_path, sql, params=None, host="", user="", password="")
     # print(params)
     sql = sql.replace("[name]", db_name)
     if host and user and password:
-        pool = await aiomysql.create_pool(host=host, user=user, password=password,
-                                          db=db_path, loop=loop)
+        pool = None
+        try:
+            pool = await aiomysql.create_pool(host=host, user=user, password=password,
+                                              db=db_path, loop=loop)
 
-        async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(sql)
-                (content,) = await cur.fetchone()
-        pool.close()
-        await pool.wait_closed()
-        # print(content)
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(sql)
+                    (content,) = await cur.fetchone()
+            # pool.close()
+            # await pool.wait_closed()
+            # print(content)
+            # return content
+        finally:
+            if not (pool is None):
+                pool.close()
+                await pool.wait_closed()
         return content
     else:
         async with aiosqlite.connect(db_path, loop=loop) as db:
@@ -630,10 +643,11 @@ async def gpt_help(message):
                     "2. Отправь вопрос в чат\n" \
                     "3. Для очистки контекста вызови тоже самое, что и в 1 пункте\n" \
                     "Контекст сохраняет последнее сообщение. Хранится два часа\n" \
-                    "/chat_mode отключает/меняет отправку лишних сообщений\n" \
+                    "/chat_mode отключает/включает отправку доп. сообщений\n" \
+                    "/bing_links отключает/включает отправку ссылок на источники\n" \
                     "/gpt4 - GPT-4\n" \
                     "/gpt3 - GPT-3.5-turbo\n" \
-                    "/bing - Bing AI\n" \
+                    "/bing - Bing AI (Не сохраняет контекст)\n" \
                     "/gpt_help для вызова этого текста."
     # print(text)
     if text == "/gpt_help":
@@ -810,24 +824,25 @@ async def gpt3(message, command_name):
                     count += 1
                     restart = False
                 except (openai.error.AuthenticationError, openai.error.RateLimitError):
-                    bad_path = f"{data_dir}/bad_gpt3.ini"
-                    if not os.path.exists(bad_path):
-                        with open(bad_path, 'w') as file_w:
-                            file_w.write("")
-
-                    with open(bad_path, "r+") as bad_file:
-                        bad_tokens = bad_file.read().split("\n")
-                        line = tokens[count][:51]
-                        if line not in bad_tokens:
-                            bad_file.write(f"{line}\n")
+                    # bad_path = f"{data_dir}/bad_gpt3.ini"
+                    # if not os.path.exists(bad_path):
+                    #     with open(bad_path, 'w') as file_w:
+                    #         file_w.write("")
+                    #
+                    # with open(bad_path, "r+") as bad_file:
+                    #     bad_tokens = bad_file.read().split("\n")
+                    #     line = tokens[count][:51]
+                    #     if line not in bad_tokens:
+                    #         bad_file.write(f"{line}\n")
                     tokens.pop(count)
                 except openai.error.APIError:
                     extra_text = "Ошибка в предыдущем сообщении выведена, но система попробует ещё раз через 5 секунд."
                     # await handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name},
                     #                        extra_text)
                     await handle_exception({"time_text": time_text, "chat_id": chat_id, "id": user_id, "fn": first_name,
-                                            "ln": last_name}, extra_text)
+                                            "ln": last_name, "command_name": command_name}, extra_text)
                     time.sleep(5)
+                    # await asyncio.sleep(5)
             else:
                 mindsdb = True
                 break
@@ -838,15 +853,17 @@ async def gpt3(message, command_name):
             except (pymysql.err.ProgrammingError, pymysql.err.OperationalError,):
                 response_text, gpt3_context = await gpt_mindsdb(text, "gpt3", gpt3_context, max_context)
 
+        response_text = response_text.replace("/nl", "\n")
+
         if len(response_text) < MAX_MESSAGE_LENGTH:
             try:
-                await bot.reply_to(message, response_text, parse_mode='Markdown')
+                await bot.reply_to(message, response_text, parse_mode='Markdown', disable_web_page_preview=True)
             except asyncio_helper.ApiTelegramException:
                 # await bot.reply_to(message, formatting.escape_markdown(response_text), parse_mode='Markdown')
                 await bot.reply_to(message, response_text)
         else:
             # await bot.send_document(chat_id, BytesIO(response_text.encode('utf-8')))
-            await bot.send_document(chat_id, BufferedReader(CustomBytesIO(response_text.encode('utf-8'))))
+            await bot.send_document(chat_id, BufferedReader(CustomBytesIO(response_text.encode('utf-8'), filename="result.txt")))
 
         # while len(response_text) > 0:
         #     response_chunk = response_text[:MAX_MESSAGE_LENGTH]
@@ -857,7 +874,7 @@ async def gpt3(message, command_name):
         gpt3_context = []
         # await handle_exception({"chat_id": chat_id, "time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
         await handle_exception({"time_text": time_text, "chat_id": chat_id, "id": user_id,
-                                "fn": first_name, "ln": last_name})
+                                "fn": first_name, "ln": last_name, "command_name": command_name})
         # hot_cache_gpt3 = {}
 
         if not is_chat_mode:
@@ -921,24 +938,26 @@ async def gpt4(message, command_name):
                     # print(gpt4_context)
                     restart = False
                 except (openai.error.AuthenticationError, openai.error.RateLimitError):
-                    bad_path = f"{data_dir}/bad_gpt4.ini"
-                    if not os.path.exists(bad_path):
-                        with open(bad_path, 'w') as file_w:
-                            file_w.write("")
-
-                    with open(bad_path, "r+") as bad_file:
-                        bad_tokens = bad_file.read().split("\n")
-                        line = tokens[count][:51]
-                        if line not in bad_tokens:
-                            bad_file.write(f"{line}\n")
+                    # bad_path = f"{data_dir}/bad_gpt4.ini"
+                    # if not os.path.exists(bad_path):
+                    #     with open(bad_path, 'w') as file_w:
+                    #         file_w.write("")
+                    #
+                    # with open(bad_path, "r+") as bad_file:
+                    #     bad_tokens = bad_file.read().split("\n")
+                    #     line = tokens[count][:51]
+                    #     if line not in bad_tokens:
+                    #         bad_file.write(f"{line}\n")
                     tokens.pop(count)
                 except openai.error.APIError:
                     extra_text = "Ошибка в предыдущем сообщении выведена, но система попробует ещё раз через 5 секунд."
                     # await handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name},
                     #                        extra_text)
                     await handle_exception({"time_text": time_text, "chat_id": chat_id, "id": user_id,
-                                            "fn": first_name, "ln": last_name}, extra_text)
+                                            "fn": first_name, "ln": last_name, "command_name": command_name},
+                                           extra_text)
                     time.sleep(5)
+                    # await asyncio.sleep(5)
             else:
                 mindsdb = True
                 break
@@ -965,16 +984,17 @@ async def gpt4(message, command_name):
         #              (spend_tokens, remain_tokens, user_id, model))
 
         # print(response_text, mindsdb)
+        response_text = response_text.replace("/nl", "\n")
 
         if len(response_text) < MAX_MESSAGE_LENGTH:
             try:
-                await bot.reply_to(message, response_text, parse_mode='Markdown')
+                await bot.reply_to(message, response_text, parse_mode='Markdown', disable_web_page_preview=True)
             except asyncio_helper.ApiTelegramException:
                 # await bot.reply_to(message, formatting.escape_markdown(response_text), parse_mode='Markdown')
                 await bot.reply_to(message, response_text)
         else:
             # await bot.send_document(chat_id, BytesIO(response_text.encode('utf-8')))
-            await bot.send_document(chat_id, BufferedReader(CustomBytesIO(response_text.encode('utf-8'))))
+            await bot.send_document(chat_id, BufferedReader(CustomBytesIO(response_text.encode('utf-8'), filename="result.txt")))
         # while len(response_text) > 0:
         #     response_chunk = response_text[:MAX_MESSAGE_LENGTH]
         #     response_text = response_text[MAX_MESSAGE_LENGTH:]
@@ -984,7 +1004,7 @@ async def gpt4(message, command_name):
         gpt4_context = []
         # await handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
         await handle_exception({"time_text": time_text, "chat_id": chat_id, "id": user_id,
-                                "fn": first_name, "ln": last_name})
+                                "fn": first_name, "ln": last_name, "command_name": command_name})
 
         if not is_chat_mode:
             await bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже.")
@@ -1002,13 +1022,18 @@ async def bing_chat(prompt):
     # gbot = await Chatbot().create()
     # print(prompt)
     # response_dict = await gbot.ask(prompt=prompt, conversation_style=ConversationStyle.creative)
-    response_dict = await gbot.ask(prompt=f"Ответ на вопрос давай в стиле Markdown. {prompt}",
-                                   conversation_style=ConversationStyle.precise)
+    response_dict = await gbot.ask(prompt=f"Ответ на следующий вопрос давай в стиле стандартного Markdown:/nl{prompt}",
+                                   conversation_style=ConversationStyle.precise, simplify_response=True)
     await gbot.close()
     # print(response_dict)
     # print(response_dict['item']['messages'][1])
-    content = re.sub(r'\[\^(\d)\^\]', "", response_dict['item']['messages'][1]['text'])
-    content = content.replace(r"**", r"*")
+    # content = re.sub(r'\[\^(\d)\^\]', "", response_dict['item']['messages'][1]['text'])
+    # content = content.replace(r"**", r"*")
+    if is_bing_links_enabled:
+        content = response_dict['adaptive_text']
+    else:
+        # content = response_dict['text']
+        content = re.sub(r'\[\^(\d)\^\]', "", response_dict['text'])
     return content
 
 
@@ -1049,28 +1074,35 @@ async def bing(message, command_name):
         text = text.replace("\n", "/nl")
         text = text.replace("\\", "/")
         # response_text, bing_context = asyncio.run(bing_chat(text, bing_context, 2))
-        response_text = await bing_chat(text)
+        try:
+            response_text = await bing_chat(text)
+        except Exception:
+            response_text = await bing_chat(text)
+
         # print(response_text)
+        response_text = response_text.replace("/nl", "\n")
+
         if len(response_text) < MAX_MESSAGE_LENGTH:
             try:
-                await bot.reply_to(message, response_text, parse_mode='Markdown')
+                await bot.reply_to(message, response_text, parse_mode='Markdown', disable_web_page_preview=True)
             except asyncio_helper.ApiTelegramException:
                 # await bot.reply_to(message, formatting.escape_markdown(response_text), parse_mode='Markdown')
                 await bot.reply_to(message, response_text)
         else:
             # await bot.send_document(chat_id, BytesIO(response_text.encode('utf-8')))
-            await bot.send_document(chat_id, BufferedReader(CustomBytesIO(response_text.encode('utf-8'))))
+            await bot.send_document(chat_id, BufferedReader(CustomBytesIO(response_text.encode('utf-8'), filename="result.txt")))
         # while len(response_text) > 0:
         #     response_chunk = response_text[:MAX_MESSAGE_LENGTH]
         #     response_text = response_text[MAX_MESSAGE_LENGTH:]
         #     await bot.reply_to(message, response_chunk, parse_mode='Markdown')
         #     # await bot.reply_to(message, response_chunk)
     except Exception as e:
+        # print(e)
         bing_context = []
         if str(e) != "'text'":
             # await handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
             await handle_exception({"time_text": time_text, "chat_id": chat_id, "id": user_id,
-                                    "fn": first_name, "ln": last_name})
+                                    "fn": first_name, "ln": last_name, "command_name": command_name})
 
         if not is_chat_mode:
             await bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже."
@@ -1105,6 +1137,9 @@ async def voice_text_help(message):
                       "1. Вызови /text_to_voice\n" \
                       "2. Отправь текстовое сообщение в чат\n" \
                       "3. Наслаждайся полученной озвучкой текста\n" \
+                      "/to_ogg Конвертация звукового файла в ogg\n" \
+                      "/to_mp3 Конвертация звукового файла в mp3\n" \
+                      "/to_wav Конвертация звукового файла в wav\n" \
                       "/voice_text_help для вызова этого текста."
     if text == "/voice_text_help":
         await bot.send_message(chat_id, voice_text_text)
@@ -1113,6 +1148,26 @@ async def voice_text_help(message):
 
 # count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
 # start_cur = time.time()
+
+
+async def change_extension(message, command_name, need_extension):
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    first_name = message.from_user.first_name
+    last_name = message.from_user.last_name
+    time_text = f"{get_time()}"
+    try:
+        file_info = await bot.get_file(message.voice.file_id)
+        # print(file_info)
+        downloaded_file = await bot.download_file(file_info.file_path)
+        # print(downloaded_file)
+        await bot.reply_to(message, "Отправка звукового файла")
+        await bot.send_audio(message.chat.id, BufferedReader(CustomBytesIO(downloaded_file, filename=need_extension)))
+    except Exception:
+        # await handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
+        await handle_exception({"time_text": time_text, "chat_id": chat_id, "id": user_id,
+                                "fn": first_name, "ln": last_name, "command_name": command_name})
+        await bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже.")
 
 
 async def voice_to_text_hf(data, voice_to_text_model, api_token):
@@ -1167,26 +1222,43 @@ async def voice_to_text(message, command_name):
         await bot.reply_to(message, "Аудио принято")
         file_info = await bot.get_file(message.voice.file_id)
         downloaded_file = await bot.download_file(file_info.file_path)
-        voice_to_text_model = "openai/whisper-large-v2"
+        huggingface_token = config.HUGGINGFACE_TOKEN
+        start_time = time.time()
+        # voice_to_text_model = "openai/whisper-large-v2"
+        voice_to_text_model = "openai/whisper-medium"
         restart = True
         num_restart = 10
         count = 0
         while restart:
-            if count <= num_restart:
+            spend_time = time.time() - start_time
+            if count <= num_restart and spend_time < 5 * 60:
+                print(spend_time)
                 count += 1
-                response = await voice_to_text_hf(downloaded_file, voice_to_text_model, config.HUGGINGFACE_TOKEN)
+                response = await voice_to_text_hf(downloaded_file, voice_to_text_model, huggingface_token)
                 try:
                     if response["error"] == f"Model {voice_to_text_model} is currently loading":
-                        print(response)
-                        time_to_sleep = response['estimated_time'] * 1.5
-                        print(f"Asleep for a while: {time_to_sleep} seconds")
+                        # print(response)
+                        # Если больше 120, то делить на 3; если больше 50, то делить на два; иначе оставить это же число
+                        # time_to_sleep = response['estimated_time'] * 1.5
+                        time_to_sleep = response['estimated_time']
+                        # print(time_to_sleep)
+                        if time_to_sleep > 120:
+                            time_to_sleep //= 3
+                        elif time_to_sleep > 50:
+                            time_to_sleep //= 2
+                        else:
+                            pass
+                        # print(time_to_sleep)
+                        # print(f"Asleep for a while: {time_to_sleep} seconds")
+                        # await asyncio.sleep(time_to_sleep)
                         time.sleep(time_to_sleep)
                         continue
                     elif response["error"] == f"Internal Server Error":
-                        print(response)
+                        # print(response)
                         time_to_sleep = 30
-                        print(f"Asleep for a while: {time_to_sleep} seconds")
+                        # print(f"Asleep for a while: {time_to_sleep} seconds")
                         time.sleep(time_to_sleep)
+                        # await asyncio.sleep(time_to_sleep)
                         continue
                 except KeyError:
                     pass
@@ -1208,7 +1280,7 @@ async def voice_to_text(message, command_name):
                     # mindsdb = True
                     # print("mindsdb")
                 except (pymysql.err.ProgrammingError, pymysql.err.OperationalError,):
-                    response = (await en_to_ru_hf(text, en_to_ru_model, config.HUGGINGFACE_TOKEN))[0]['translation_text']
+                    response = (await en_to_ru_hf(text, en_to_ru_model, huggingface_token))[0]['translation_text']
                     # print("Hugging Face")
                 # finally:
                 # if mindsdb:
@@ -1225,10 +1297,11 @@ async def voice_to_text(message, command_name):
             else:
                 # print(f"Speech recognition isn`t available right now, try again later.")
                 await bot.reply_to(message, "Распознавание речи сейчас недоступно, повторите попытку позже.")
+                restart = False
     except Exception:
         # await handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
         await handle_exception({"time_text": time_text, "chat_id": chat_id, "id": user_id,
-                                "fn": first_name, "ln": last_name})
+                                "fn": first_name, "ln": last_name, "command_name": command_name})
         await bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже.")
     # print(file_info)
     # print("\n\n\n")
@@ -1268,7 +1341,7 @@ async def voice_to_text(message, command_name):
     except Exception:
         # await handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
         await handle_exception({"time_text": time_text, "chat_id": chat_id, "id": user_id,
-                                "fn": first_name, "ln": last_name})
+                                "fn": first_name, "ln": last_name, "command_name": command_name})
         await bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже. \n")
 
 
@@ -1295,16 +1368,21 @@ async def text_to_voice(message, command_name):
     try:
         audio_data = BytesIO()
         gTTS(text=message.text, lang='ru').write_to_fp(audio_data)
+        # print(audio_data.read())
         audio_data.seek(0)
+        # print(audio_data.read())
+        # audio_data = BufferedReader(CustomBytesIO(data, filename="result.ogg"))
         # gTTS(text=message.text, lang='ru').save(f"{output_dir}/voice_{user_id}.mp3")
         # await bot.send_audio(message.chat.id, open(f"{output_dir}/voice_{user_id}.mp3", 'rb'))
-        await bot.send_audio(message.chat.id, audio_data)
+        # await bot.send_audio(message.chat.id, audio_data)
+        await bot.reply_to(message, "Отправка звукового файла")
+        await bot.send_audio(message.chat.id, BufferedReader(CustomBytesIO(audio_data.read(), filename="result.ogg")))
         # os.remove(f"{output_dir}/voice_{user_id}.mp3")
     except Exception:
         # await handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
         await handle_exception({"time_text": time_text, "chat_id": chat_id, "id": user_id,
-                                "fn": first_name, "ln": last_name})
-        await bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже. \n")
+                                "fn": first_name, "ln": last_name, "command_name": command_name})
+        await bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже.")
 
 
 # count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
@@ -1471,7 +1549,7 @@ async def get_app_help(message):
 
 
 async def get_app(message):
-    def clear_folder(path):
+    async def clear_folder(path):
         if not os.path.exists(path):
             os.makedirs(path)
         file_list = os.listdir(path)
@@ -1485,17 +1563,19 @@ async def get_app(message):
             else:
                 os.remove(s)
 
-    def get_zip(file, path_to, url):
+    async def get_zip(file, path_to, url):
         with open(f"{path_to}/{file}", "wb") as new_file:
             new_file.write(requests.get(url).content)
         time.sleep(1)
+        # await asyncio.sleep(1)
 
-    def extract_zip(file, path_from, path_to):
+    async def extract_zip(file, path_from, path_to):
         with zipfile.ZipFile(f"{path_from}/{file}", 'r') as zip_file:
             zip_file.extractall(path_to)
         time.sleep(5)
+        # await asyncio.sleep(5)
 
-    def create_zip(zip_name, path_from, need_files_dirs=None):
+    async def create_zip(zip_name, path_from, need_files_dirs=None):
         with zipfile.ZipFile(rf"{path_from}/{zip_name}", 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
             for path in need_files_dirs:
                 path = rf"{path_from}/{path}"
@@ -1522,10 +1602,11 @@ async def get_app(message):
                                     arc_path = rf"{arc_path}/{p}"
                             zipf.write(file_path, arc_path.strip("/"))
 
-    def delete_zip(file, from_path):
+    async def delete_zip(file, from_path):
         try:
             os.remove(f"{from_path}/{file}")
             time.sleep(2)
+            # await asyncio.sleep(2)
         except OSError:
             pass
 
@@ -1553,15 +1634,16 @@ async def get_app(message):
 
     zip_file = "Zapzatron_GUI.zip"
     need_files = ["Update.bat", "Update_2.0.bat", "Python3109", "Photos_or_Icons", "Update", "Update_2.0", "Fonts"]
-    get_zip(zip_file, extract_path, "https://github.com/Zapzatron/GUI/archive/refs/heads/master.zip")
-    extract_zip(zip_file, extract_path, temp_path)
-    extract_zip("Python3109.zip", extract_path, extract_path)
-    delete_zip(zip_file, extract_path)
-    create_zip(zip_file, extract_path, need_files)
+    await get_zip(zip_file, extract_path, "https://github.com/Zapzatron/GUI/archive/refs/heads/master.zip")
+    await extract_zip(zip_file, extract_path, temp_path)
+    await extract_zip("Python3109.zip", extract_path, extract_path)
+    await delete_zip(zip_file, extract_path)
+    await create_zip(zip_file, extract_path, need_files)
     await bot.reply_to(message, f"Отправляю установщик...")
     await bot.send_document(chat_id, open(rf'{extract_path}/Zapzatron_GUI.zip', 'rb'))
     time.sleep(5)
-    clear_folder(extract_path)
+    # await asyncio.sleep(5)
+    await clear_folder(extract_path)
 
 
 # count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
@@ -1636,8 +1718,10 @@ async def get_file(message, command_name):
         await bot.reply_to(message, "Возможно вы ввели неправильную ссылку, попробуйте ещё раз.")
         return
     time.sleep(2)
+    # await asyncio.sleep(2)
     await bot.send_document(chat_id, open(rf"{temp_path}/{file_name}", 'rb'))
     time.sleep(5)
+    # await asyncio.sleep(5)
     clear_folder(temp_path)
 
 
@@ -1704,32 +1788,23 @@ async def stop_bot(message):
 # count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
 # start_cur = time.time()
 
-#################################
-#################################
-is_production = False
-is_webhook = False
-#################################
-#################################
-is_production_auto_check = True
-#################################
-#################################
-
-
-if is_production_auto_check and config.IS_PRODUCTION:
-    is_production = True
+#######################################
+is_production = config.IS_PRODUCTION
+is_webhook = config.IS_WEBHOOK
+#######################################
 
 # Считывание токена телеграм бота и создание его.
 if is_production:
-    is_webhook = True
     bot = AsyncTeleBot(config.TELEGRAM_BOT_TOKEN, exception_handler=ExceptionHandler())
-    WEBHOOK_PATH = f"/bot/{config.TELEGRAM_BOT_TOKEN}"
+    if is_webhook:
+        WEBHOOK_PATH = f"/bot/{config.TELEGRAM_BOT_TOKEN}"
 else:
-    # bot = AsyncTeleBot(config.TEST_TELEGRAM_BOT_TOKEN, exception_handler=ExceptionHandler(), parse_mode="Markdown")
     bot = AsyncTeleBot(config.TEST_TELEGRAM_BOT_TOKEN, exception_handler=ExceptionHandler())
-    WEBHOOK_PATH = f"/bot/{config.TEST_TELEGRAM_BOT_TOKEN}"
+    if is_webhook:
+        WEBHOOK_PATH = f"/bot/{config.TEST_TELEGRAM_BOT_TOKEN}"
 
 if is_webhook:
-    WEBHOOK_URL = f"{config.NGROK_TUNNEL_URL}{WEBHOOK_PATH}"
+    WEBHOOK_URL = f"{config.WebHook_TUNNEL_URL}{WEBHOOK_PATH}"
     app = web.Application()
 
 
@@ -1760,7 +1835,6 @@ data_dir = os.path.join(work_dir, "data")
 logs_dir = os.path.join(work_dir, "logs")
 temp_dir = os.path.join(work_dir, "temp")
 
-
 # count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
 # print("Дальше тормознутый элемент")
 # start_cur = time.time()
@@ -1769,10 +1843,12 @@ temp_dir = os.path.join(work_dir, "temp")
 asyncio.run(bot.set_my_commands([
     telebot.types.BotCommand("/start", "Перезапуск чата с ботом (не удаляет ничего)"),
     telebot.types.BotCommand("/menu", "Вызвать меню бота"),
+    telebot.types.BotCommand("/donation", "Поддержать разработчика"),
     telebot.types.BotCommand("/gpt4", "GPT-4"),
     telebot.types.BotCommand("/gpt3", "GPT-3"),
     telebot.types.BotCommand("/bing", "Bing AI"),
-    telebot.types.BotCommand("/chat_mode", "Отключает/меняет отправку лишних сообщений"),
+    telebot.types.BotCommand("/bing_links", "Отключить/включить отправку ссылок на источники"),
+    telebot.types.BotCommand("/chat_mode", "Отключить/включить отправку доп. сообщений"),
     telebot.types.BotCommand("/voice_to_text", "Голос в текст"),
     telebot.types.BotCommand("/text_to_voice", "Текст в голос"),
 ]))
@@ -1784,6 +1860,8 @@ asyncio.run(bot.set_my_commands([
 timeout_messages = 10
 # Включение и отключение чат мода (Отправлять ли уведомления, например, "Запрос отправлен")
 is_chat_mode = False
+# Включение и отключение ссылок, в которых бинг искал ответ
+is_bing_links_enabled = False
 # Словарь для проверки на спам
 user_use_dict = {}
 # Максимальная длина для сообщения телеграмм
@@ -1796,12 +1874,16 @@ user_prompts_db = "user_prompts.db"
 user_data_db = "user_data.db"
 user_state = {}
 
-actions = ["/gpt4", "/gpt3", "/bing", "/voice_to_text", "/text_to_voice", "/gen_words_ru", "/get_file"]
+actions = ["/gpt4", "/gpt3", "/bing", "/voice_to_text", "/to_ogg",  "/to_mp3",  "/to_wav", "/text_to_voice",
+           "/gen_words_ru", "/get_file"]
 actions_text = {
     "/gpt4": "Отправьте вопрос к GPT4 в чат",
     "/gpt3": "Отправьте вопрос к GPT3 в чат",
     "/bing": "Отправьте вопрос к Bing AI в чат",
     "/voice_to_text": "Отправьте голосовое сообщение в чат",
+    "/to_ogg": "Отправьте голосовое сообщение в чат",
+    "/to_mp3": "Отправьте голосовое сообщение в чат",
+    "/to_wav": "Отправьте голосовое сообщение в чат",
     "/text_to_voice": "Отправьте текстовое сообщение в чат",
     "/gen_words_ru": "Отправьте набор русских букв в чат",
     "/get_file": "Отправьте ссылку на файл в чат"
@@ -1830,6 +1912,7 @@ asyncio.run(work_with_db(f"{data_dir}/{user_prompts_db}",
 asyncio.run(work_with_db(f"{data_dir}/{user_data_db}",
                          '''CREATE TABLE IF NOT EXISTS [name]
                          (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, fn TEXT, ln TEXT, start_in_Moscow TEXT)'''))
+
 
 # count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
 # start_cur = time.time()
@@ -1897,6 +1980,15 @@ async def get_command_text(message):
     global bing_context
     global is_chat_mode
     global timeout_messages
+    global is_bing_links_enabled
+
+    if round(time.time()) - message.date > 1 * 60:  # 1 минута
+        return
+
+    if message.chat.type != "private":
+        await bot.reply_to(message, "Бот доступен только в → https://t.me/Zapzatron_Bot")
+        return
+
     chat_id = message.chat.id
     user_id = message.from_user.id
     first_name = message.from_user.first_name
@@ -1905,8 +1997,6 @@ async def get_command_text(message):
     cur_time = get_time(strp=True)
     # print(message)
     # print(text)
-    if round(time.time()) - message.date > 1 * 60:  # 1 минута
-        return
 
     message_2 = {"chat_id": chat_id,
                  "message_id": message.id,
@@ -1932,8 +2022,15 @@ async def get_command_text(message):
                 return
             asyncio.run(handle_exception())
 
-    if message.content_type == "voice" and user_id in user_state and user_state[user_id][0] == "/voice_to_text":
-        await voice_to_text(message, user_state[user_id][0])
+    if message.content_type == "voice" and user_id in user_state:
+        if user_state[user_id][0] == "/voice_to_text":
+            await voice_to_text(message, user_state[user_id][0])
+        elif user_state[user_id][0] == "/to_ogg":
+            await change_extension(message, user_state[user_id][0], "result.ogg")
+        elif user_state[user_id][0] == "/to_mp3":
+            await change_extension(message, user_state[user_id][0], "result.mp3")
+        elif user_state[user_id][0] == "/to_wav":
+            await change_extension(message, user_state[user_id][0], "result.wav")
     elif message.content_type == "text" and text == "/menu":
         await menu(message_2)
     elif message.content_type == "text" and text[0] == "/" and text in actions:
@@ -1969,11 +2066,17 @@ async def get_command_text(message):
             await user_info(message)
         elif text == "/chat_mode":
             is_chat_mode = not is_chat_mode
-            timeout_messages = 1
+            timeout_messages = 5
             if is_chat_mode:
                 await bot.reply_to(message, "Чат мод активирован")
             else:
                 await bot.reply_to(message, "Чат мод деактивирован")
+        elif text == "/bing_links":
+            is_bing_links_enabled = not is_bing_links_enabled
+            if is_bing_links_enabled:
+                await bot.reply_to(message, "Ссылки от бинга включены")
+            else:
+                await bot.reply_to(message, "Ссылки от бинга отключены")
         elif text == "/stop_bot":
             await stop_bot(message)
     elif message.content_type == "text" and text[0] != "/":
@@ -2017,7 +2120,7 @@ async def run_info():
                   write_file=True,
                   logs_dir_=logs_dir)
     await logging(logs=f"Информация:\n"
-                       f"  • Хостинг: {is_production}\n"
+                       f"  • Производство: {is_production}\n"
                        f"  • WebHook: {is_webhook}\n"
                        f"  • Время: {start_time}\n"
                        f"  • Система: {platform.system()}\n"
@@ -2063,7 +2166,6 @@ def shutdown(signum, frame):
 
 signal.signal(signal.SIGINT, shutdown)
 
-
 if __name__ == "__main__":
     while True:
         try:
@@ -2082,3 +2184,4 @@ if __name__ == "__main__":
                 asyncio.run(bot.polling())
         except Exception:
             asyncio.run(handle_exception())
+            time.sleep(1)

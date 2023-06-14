@@ -4,6 +4,7 @@ import subprocess
 import pkg_resources
 from importlib import import_module
 import importlib
+import platform
 
 
 def check_req_packages(packages, show_package_info=False):
@@ -29,15 +30,16 @@ def check_req_packages(packages, show_package_info=False):
                     importlib.reload(pkg_resources)
                     version = pkg_resources.get_distribution(temp[0]).version
                     if version != temp[1]:
+                        # print(show_package_info, flush=True)
                         if show_package_info:
-                            print(f"Name: {package}; Current: {version}; Need: {temp[1]}")
+                            print(f"Name: {package}; Current: {version}; Need: {temp[1]}", flush=True)
                         raise ModuleNotFoundError
 
         for package in packages:
-            print(f"{package} is ok :)")
+            print(f"{package} is ok :)", flush=True)
     except FileNotFoundError:
         print(f"{checking_package} is not ok :(", flush=True)
-        print(f"I will try to install this automatically.")
+        print(f"I will try to install this automatically.", flush=True)
         if checking_package == "ffmpeg":
             ffdl_downl = subprocess.run([sys.executable, "-m", "pip", "install", "ffmpeg-downloader", "--no-cache-dir"],
                                         capture_output=True, text=True)
@@ -46,10 +48,14 @@ def check_req_packages(packages, show_package_info=False):
             ffdl = subprocess.run(["ffdl", "install", "-y"], capture_output=True, text=True)
             # print(ffdl.stdout)
             # print(ffdl.stderr)
-        check_req_packages(packages)
+        check_req_packages(packages, show_package_info)
     except (ModuleNotFoundError, ImportError):
         print(f"{checking_package} is not ok :(", flush=True)
-        print(f"I will try to install this automatically.")
-        subprocess.run([sys.executable, "-m", "pip", "install", packages[checking_package], "--no-cache-dir"],
-                       capture_output=True, text=True)
-        check_req_packages(packages)
+        print(f"I will try to install this automatically.", flush=True)
+        if platform.system() == "Linux":
+            subprocess.run(["sudo", sys.executable, "-m", "pip", "install", packages[checking_package], "--no-cache-dir"],
+                           capture_output=True, text=True)
+        else:
+            subprocess.run([sys.executable, "-m", "pip", "install", packages[checking_package], "--no-cache-dir"],
+                           capture_output=True, text=True)
+        check_req_packages(packages, show_package_info)
