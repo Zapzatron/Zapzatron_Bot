@@ -9,7 +9,7 @@ packages = {
     "gtts": "gTTS==2.3.2",
     "openai": "openai==0.27.0",
     "aiohttp": "aiohttp==3.8.4",
-    "EdgeGPT": "EdgeGPT==0.10.14",  # 0.8.2 (Говорят работает, но не особо как-то)
+    "EdgeGPT": "EdgeGPT==0.11.1",  # 0.8.2 (Говорят работает, но не особо как-то)
     "pandas": "pandas==1.3.5",
     "mindsdb_sdk": "mindsdb-sdk==1.0.2",
     "pymysql": "PyMySQL==1.0.3",
@@ -58,6 +58,7 @@ import data.config as config  # Используется для импорта �
 from telebot.async_telebot import AsyncTeleBot  # Используется для создания асинхронного экземпляра класса TeleBot
 # from telebot import formatting
 from aiohttp import web  # Используется для создания HTTP-сервера и клиента с помощью asyncio
+import subprocess
 # import mindsdb_sdk # Используется для работы с MindsDB SDK
 # import atexit  # Используется для регистрации функций, которые будут вызваны при выходе из программы
 import datetime  # Используется для работы с датами и временем
@@ -115,6 +116,13 @@ def read_file(file_name, split_symbol="\n"):
 
 
 class CustomBytesIO(BytesIO):
+    """
+    Класс `CustomBytesIO` является подклассом встроенного класса `BytesIO` в Python.
+    Он добавляет атрибут `name` к классу `BytesIO`, который представляет имя файла.
+    Метод `__init__` принимает аргумент `filename`, присваивает его атрибуту `name`,
+    а затем вызывает метод `__init__` родительского класса с любыми оставшимися аргументами
+    и аргументами ключевых слов.
+    """
     def __init__(self, *args, filename, **kwargs):
         self.name = filename
         super().__init__(*args, **kwargs)
@@ -167,44 +175,34 @@ async def logging(logs: str, print_logs: bool = True, write_file: bool = False,
             logs = logs.replace(ansi_codes[code], "")
 
     try:
-        if not (bot is None) and bot.token == config.TELEGRAM_BOT_TOKEN:
+        if not (bot is None) and bot.token == telegram_bot_token:
             # temp = logs
-            if len(logs) < MAX_MESSAGE_LENGTH:
-                await bot.send_message(config.TELEGRAM_LOGS_CHANNEL, logs)
+            if len(logs) < max_message_length:
+                await bot.send_message(telegram_logs_channel, logs)
             else:
-                await bot.send_document(config.TELEGRAM_LOGS_CHANNEL,
+                await bot.send_document(telegram_logs_channel,
                                         BufferedReader(CustomBytesIO(logs.encode('utf-8'), filename="result.txt")))
-                # temp_logs_file = f"{temp_dir}/logs/{logs[1:19]}.txt"
-                # with open(temp_logs_file, "w", encoding="utf-8") as f:
-                #     f.write(logs)
-                # await bot.send_document(-1001957630208, open(temp_logs_file, 'rb'))
-                # time.sleep(2)
-                # os.remove(temp_logs_file)
-            # while len(temp) > 0:
-            #     response_chunk = temp[:MAX_MESSAGE_LENGTH]
-            #     temp = temp[MAX_MESSAGE_LENGTH:]
-            #     await bot.send_message(-1001957630208, response_chunk)
     except Exception as e:
         print(e)
         pass
 
-    # if write_file:
-    #     if not os.path.exists(logs_dir_):
-    #         os.makedirs(logs_dir_)
-    #
-    #     if logs_file_name is None:
-    #         logs_file_name = f"{logs_dir_}/{logs[1:11]}.txt"
-    #     else:
-    #         logs_file_name = f"{logs_dir_}/{logs_file_name}.txt"
-    #
-    #     if os.path.exists(logs_file_name):
-    #         with open(logs_file_name, 'r', encoding='utf-8') as logs_file:
-    #             previous_text = logs_file.read()
-    #         with open(logs_file_name, 'w', encoding='utf-8') as logs_file:
-    #             logs_file.write(previous_text + logs + "\n")
-    #     else:
-    #         with open(logs_file_name, 'w', encoding='utf-8') as logs_file:
-    #             logs_file.write(logs + "\n")
+    if write_file:
+        if not os.path.exists(logs_dir_):
+            os.makedirs(logs_dir_)
+
+        if logs_file_name is None:
+            logs_file_name = f"{logs_dir_}/{logs[1:11]}.txt"
+        else:
+            logs_file_name = f"{logs_dir_}/{logs_file_name}.txt"
+
+        if os.path.exists(logs_file_name):
+            with open(logs_file_name, 'r', encoding='utf-8') as logs_file:
+                previous_text = logs_file.read()
+            with open(logs_file_name, 'w', encoding='utf-8') as logs_file:
+                logs_file.write(previous_text + logs + "\n")
+        else:
+            with open(logs_file_name, 'w', encoding='utf-8') as logs_file:
+                logs_file.write(logs + "\n")
 
 
 # count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
@@ -269,16 +267,16 @@ async def handle_exception(message=None, extra_text=None):
                            f"Chat Id: {message['chat_id']} "
                            f"Id: {message['id']} Fn: {message['fn']} "
                            f"Ln: {message['ln']} Do: {message['command_name']} Ошибка: \n{error}\033[0m",
-                      write_file=True,
+                      write_file=need_write_logs_file,
                       logs_dir_=logs_dir)
     else:
         await logging(logs=f"\033[31m[{get_time()}] Ошибка: \n{error}\033[0m",
-                      write_file=True,
+                      write_file=need_write_logs_file,
                       logs_dir_=logs_dir)
     if extra_text:
         await logging(logs=f"\033[31m[{message['time_text']}] "
                            f"{extra_text}\033[0m",
-                      write_file=True,
+                      write_file=need_write_logs_file,
                       logs_dir_=logs_dir)
     print("-" * 120)
 
@@ -338,7 +336,7 @@ async def is_spam(message, use_interval: datetime.timedelta = datetime.timedelta
         await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                            f"Id: {user_id} Fn: {first_name} "
                            f"Ln: {last_name} Do: {command_name}",
-                      write_file=True,
+                      write_file=need_write_logs_file,
                       logs_dir_=logs_dir)
     else:
         success_comm_time = user_use_dict[userid_comm]
@@ -348,7 +346,7 @@ async def is_spam(message, use_interval: datetime.timedelta = datetime.timedelta
             await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                                f"Id: {user_id} Fn: {first_name} "
                                f"Ln: {last_name} Do: {command_name}",
-                          write_file=True,
+                          write_file=need_write_logs_file,
                           logs_dir_=logs_dir)
             return False
         else:
@@ -356,7 +354,7 @@ async def is_spam(message, use_interval: datetime.timedelta = datetime.timedelta
             await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                                f"Id: {user_id} Fn: {first_name} "
                                f"Ln: {last_name} Do: Спам {command_name}",
-                          write_file=True,
+                          write_file=need_write_logs_file,
                           logs_dir_=logs_dir)
             return True
 
@@ -465,7 +463,7 @@ async def gen_markup(buttons_list, buttons_dest="auto", markup_type="Reply", cal
 
 
 async def work_with_db(db_path, sql, params=None, host="", user="", password=""):
-    loop = asyncio.get_event_loop()
+    # loop = asyncio.get_event_loop()
     # print(db)
     db_name = os.path.basename(urlparse(db_path).path)
     if db_name[-3:] == ".db":
@@ -475,10 +473,12 @@ async def work_with_db(db_path, sql, params=None, host="", user="", password="")
     sql = sql.replace("[name]", db_name)
     if host and user and password:
         pool = None
+        content = None
         try:
+            # pool = await aiomysql.create_pool(host=host, user=user, password=password,
+            #                                   db=db_path, loop=loop)
             pool = await aiomysql.create_pool(host=host, user=user, password=password,
-                                              db=db_path, loop=loop)
-
+                                              db=db_path)
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     await cur.execute(sql)
@@ -487,19 +487,28 @@ async def work_with_db(db_path, sql, params=None, host="", user="", password="")
             # await pool.wait_closed()
             # print(content)
             # return content
+        except Exception as e:
+            await handle_exception()
+            # await logging(logs=f"[{get_time()}] Error:\n{e}",
+            #               write_file=need_write_logs_file,
+            #               logs_dir_=logs_dir)
         finally:
             if not (pool is None):
                 pool.close()
                 await pool.wait_closed()
-        return content
+        if not (content is None):
+            return content
+        else:
+            return False
     else:
-        async with aiosqlite.connect(db_path, loop=loop) as db:
+        # async with aiosqlite.connect(db_path, loop=loop) as db:
+        async with aiosqlite.connect(db_path) as db:
             if params:
                 cursor = await db.execute(sql, params)
             else:
                 cursor = await db.execute(sql)
             rows = None
-            if sql[:6] == "CREATE" or sql[:6] == "DELETE" or sql[:6] == "INSERT":
+            if sql[:6] == "CREATE" or sql[:6] == "DELETE" or sql[:6] == "INSERT" or sql[:6] == "UPDATE":
                 await db.commit()
             if sql[:6] == "SELECT":
                 rows = await cursor.fetchall()
@@ -530,7 +539,7 @@ async def commands(message):
         await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                            f"Id: {user_id} Fn: {first_name} "
                            f"Ln: {last_name} Do: {text}",
-                      write_file=True,
+                      write_file=need_write_logs_file,
                       logs_dir_=logs_dir)
 
     commands_text = "Для вызова меню бота /menu\n" \
@@ -550,18 +559,13 @@ async def commands(message):
                     "7. ...\n" \
                     "/commands для вызова этого текста."
     if text == "/start":
-        # if not work_with_db(user_data_db, data_dir, "SELECT user_id FROM [name] where user_id = ?", (user_id,)):
         if not await work_with_db(f"{data_dir}/{user_data_db}", "SELECT user_id FROM [name] where user_id = ?",
                                   (user_id,)):
-            # work_with_db(user_data_db, data_dir,
-            #              "INSERT INTO [name] (user_id, fn, ln, start_in_Moscow) VALUES (?, ?, ?, ?)",
-            #              (user_id, first_name, last_name, time_text))
             await work_with_db(f"{data_dir}/{user_data_db}",
                                "INSERT INTO [name] (user_id, fn, ln, start_in_Moscow) VALUES (?, ?, ?, ?)",
                                (user_id, first_name, last_name, time_text))
         commands_text = "Привет, добро пожаловать в Zapzatron Bot.\n" + commands_text
     if text == "/commands" or text == "/start":
-        # bot.send_message(chat_id, help_text, reply_markup=gen_markup(["/help"]))
         await bot.send_message(chat_id, commands_text)
     return commands_text
 
@@ -581,7 +585,7 @@ async def about_us(message):
         await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                            f"Id: {user_id} Fn: {first_name} "
                            f"Ln: {last_name} Do: {text}",
-                      write_file=True,
+                      write_file=need_write_logs_file,
                       logs_dir_=logs_dir)
 
     about_us_text = "Благодарим вас за использование нашего проекта!\n" \
@@ -608,7 +612,7 @@ async def donation(message):
     await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                        f"Id: {user_id} Fn: {first_name} "
                        f"Ln: {last_name} Do: {message['text']}",
-                  write_file=True,
+                  write_file=need_write_logs_file,
                   logs_dir_=logs_dir)
     markup = telebot.types.InlineKeyboardMarkup()
     button_text = "🍓 Поддержать разработчика 🍓"
@@ -636,7 +640,7 @@ async def gpt_help(message):
         await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                            f"Id: {user_id} Fn: {first_name} "
                            f"Ln: {last_name} Do: {text}",
-                      write_file=True,
+                      write_file=need_write_logs_file,
                       logs_dir_=logs_dir)
     gpt_help_text = "Что сделать для доступа к GPT?:\n" \
                     "1. Вызови /gpt4 или /gpt3 или /bing\n" \
@@ -739,7 +743,9 @@ async def gpt_mindsdb(prompt, model, chat_context=None, max_context=20):
     # content = response['response']
 
     content = await work_with_db(db_name, sql, host="cloud.mindsdb.com",
-                                 user=config.MINDSDB_USER, password=config.MINDSDB_PASSWORD)
+                                 user=mindsdb_user, password=mindsdb_password)
+    if not content:
+        raise pymysql.err.OperationalError
     # print(content)
     # print(f"work_with_db():\n{content}")
 
@@ -793,12 +799,9 @@ async def gpt3(message, command_name):
     try:
         if not is_chat_mode:
             await bot.reply_to(message, "Запрос отправлен на обработку, пожалуйста подождите.")
-        # work_with_db(user_prompts_db, data_dir,
-        #              "INSERT INTO user_prompts (user_id, fn, ln, text, time, command) VALUES (?, ?, ?, ?, ?, ?)",
-        #              (user_id, first_name, last_name, text, time_text, command_name))
         await work_with_db(f"{data_dir}/{user_prompts_db}",
-                           "INSERT INTO user_prompts (user_id, fn, ln, text, time, command) VALUES (?, ?, ?, ?, ?, ?)",
-                           (user_id, first_name, last_name, text, time_text, command_name))
+                           "INSERT INTO user_prompts (user_id, fn, ln, question, answer, time, command) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                           (user_id, first_name, last_name, text, "", time_text, command_name))
         text = text.replace("'", '"')
         text = text.replace("\n", "/nl")
         text = text.replace("\\", "/")
@@ -823,7 +826,9 @@ async def gpt3(message, command_name):
                                                                    gpt3_context, temperature, max_tokens, max_context)
                     count += 1
                     restart = False
-                except (openai.error.AuthenticationError, openai.error.RateLimitError):
+                except (openai.error.AuthenticationError,
+                        openai.error.RateLimitError,
+                        openai.error.InvalidRequestError):
                     # bad_path = f"{data_dir}/bad_gpt3.ini"
                     # if not os.path.exists(bad_path):
                     #     with open(bad_path, 'w') as file_w:
@@ -855,7 +860,11 @@ async def gpt3(message, command_name):
 
         response_text = response_text.replace("/nl", "\n")
 
-        if len(response_text) < MAX_MESSAGE_LENGTH:
+        await work_with_db(f"{data_dir}/{user_prompts_db}",
+                           "UPDATE user_prompts SET answer = ? WHERE user_id = ? AND time = ? AND command = ?;",
+                           (response_text, user_id, time_text, command_name))
+
+        if len(response_text) < max_message_length:
             try:
                 await bot.reply_to(message, response_text, parse_mode='Markdown', disable_web_page_preview=True)
             except asyncio_helper.ApiTelegramException:
@@ -863,13 +872,8 @@ async def gpt3(message, command_name):
                 await bot.reply_to(message, response_text)
         else:
             # await bot.send_document(chat_id, BytesIO(response_text.encode('utf-8')))
-            await bot.send_document(chat_id, BufferedReader(CustomBytesIO(response_text.encode('utf-8'), filename="result.txt")))
-
-        # while len(response_text) > 0:
-        #     response_chunk = response_text[:MAX_MESSAGE_LENGTH]
-        #     response_text = response_text[MAX_MESSAGE_LENGTH:]
-        #     await bot.reply_to(message, response_chunk, parse_mode='Markdown')
-        #     # await bot.reply_to(message, response_chunk)
+            file_data = BufferedReader(CustomBytesIO(response_text.encode('utf-8'), filename="result.txt"))
+            await bot.send_document(chat_id, file_data)
     except Exception:
         gpt3_context = []
         # await handle_exception({"chat_id": chat_id, "time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
@@ -905,12 +909,9 @@ async def gpt4(message, command_name):
     try:
         if not is_chat_mode:
             await bot.reply_to(message, "Запрос отправлен на обработку, пожалуйста подождите.")
-        # work_with_db(user_prompts_db, data_dir,
-        #              "INSERT INTO user_prompts (user_id, fn, ln, text, time, command) VALUES (?, ?, ?, ?, ?, ?)",
-        #              (user_id, first_name, last_name, text, time_text, command_name))
         await work_with_db(f"{data_dir}/{user_prompts_db}",
-                           "INSERT INTO user_prompts (user_id, fn, ln, text, time, command) VALUES (?, ?, ?, ?, ?, ?)",
-                           (user_id, first_name, last_name, text, time_text, command_name))
+                           "INSERT INTO user_prompts (user_id, fn, ln, question, answer, time, command) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                           (user_id, first_name, last_name, text, "", time_text, command_name))
         text = text.replace("'", '"')
         text = text.replace("\n", "/nl")
         text = text.replace("\\", "/")
@@ -937,7 +938,9 @@ async def gpt4(message, command_name):
                     count += 1
                     # print(gpt4_context)
                     restart = False
-                except (openai.error.AuthenticationError, openai.error.RateLimitError):
+                except (openai.error.AuthenticationError,
+                        openai.error.RateLimitError,
+                        openai.error.InvalidRequestError):
                     # bad_path = f"{data_dir}/bad_gpt4.ini"
                     # if not os.path.exists(bad_path):
                     #     with open(bad_path, 'w') as file_w:
@@ -986,7 +989,11 @@ async def gpt4(message, command_name):
         # print(response_text, mindsdb)
         response_text = response_text.replace("/nl", "\n")
 
-        if len(response_text) < MAX_MESSAGE_LENGTH:
+        await work_with_db(f"{data_dir}/{user_prompts_db}",
+                           "UPDATE user_prompts SET answer = ? WHERE user_id = ? AND time = ? AND command = ?;",
+                           (response_text, user_id, time_text, command_name))
+
+        if len(response_text) < max_message_length:
             try:
                 await bot.reply_to(message, response_text, parse_mode='Markdown', disable_web_page_preview=True)
             except asyncio_helper.ApiTelegramException:
@@ -994,12 +1001,8 @@ async def gpt4(message, command_name):
                 await bot.reply_to(message, response_text)
         else:
             # await bot.send_document(chat_id, BytesIO(response_text.encode('utf-8')))
-            await bot.send_document(chat_id, BufferedReader(CustomBytesIO(response_text.encode('utf-8'), filename="result.txt")))
-        # while len(response_text) > 0:
-        #     response_chunk = response_text[:MAX_MESSAGE_LENGTH]
-        #     response_text = response_text[MAX_MESSAGE_LENGTH:]
-        #     await bot.reply_to(message, response_chunk, parse_mode='Markdown')
-        #     # await bot.reply_to(message, response_chunk)
+            file_data = BufferedReader(CustomBytesIO(response_text.encode('utf-8'), filename="result.txt"))
+            await bot.send_document(chat_id, file_data)
     except Exception:
         gpt4_context = []
         # await handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
@@ -1029,6 +1032,7 @@ async def bing_chat(prompt):
     # print(response_dict['item']['messages'][1])
     # content = re.sub(r'\[\^(\d)\^\]', "", response_dict['item']['messages'][1]['text'])
     # content = content.replace(r"**", r"*")
+    # print(response_dict['adaptive_text'])
     if is_bing_links_enabled:
         content = response_dict['adaptive_text']
     else:
@@ -1063,12 +1067,9 @@ async def bing(message, command_name):
     try:
         if not is_chat_mode:
             await bot.reply_to(message, "Запрос отправлен на обработку, пожалуйста подождите.")
-        # work_with_db(user_prompts_db, data_dir,
-        #              "INSERT INTO user_prompts (user_id, fn, ln, text, time, command) VALUES (?, ?, ?, ?, ?, ?)",
-        #              (user_id, first_name, last_name, text, time_text, command_name))
         await work_with_db(f"{data_dir}/{user_prompts_db}",
-                           "INSERT INTO user_prompts (user_id, fn, ln, text, time, command) VALUES (?, ?, ?, ?, ?, ?)",
-                           (user_id, first_name, last_name, text, time_text, command_name))
+                           "INSERT INTO user_prompts (user_id, fn, ln, question, answer, time, command) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                           (user_id, first_name, last_name, text, "", time_text, command_name))
 
         text = text.replace("'", '"')
         text = text.replace("\n", "/nl")
@@ -1082,7 +1083,11 @@ async def bing(message, command_name):
         # print(response_text)
         response_text = response_text.replace("/nl", "\n")
 
-        if len(response_text) < MAX_MESSAGE_LENGTH:
+        await work_with_db(f"{data_dir}/{user_prompts_db}",
+                           "UPDATE user_prompts SET answer = ? WHERE user_id = ? AND time = ? AND command = ?;",
+                           (response_text, user_id, time_text, command_name))
+
+        if len(response_text) < max_message_length:
             try:
                 await bot.reply_to(message, response_text, parse_mode='Markdown', disable_web_page_preview=True)
             except asyncio_helper.ApiTelegramException:
@@ -1090,12 +1095,8 @@ async def bing(message, command_name):
                 await bot.reply_to(message, response_text)
         else:
             # await bot.send_document(chat_id, BytesIO(response_text.encode('utf-8')))
-            await bot.send_document(chat_id, BufferedReader(CustomBytesIO(response_text.encode('utf-8'), filename="result.txt")))
-        # while len(response_text) > 0:
-        #     response_chunk = response_text[:MAX_MESSAGE_LENGTH]
-        #     response_text = response_text[MAX_MESSAGE_LENGTH:]
-        #     await bot.reply_to(message, response_chunk, parse_mode='Markdown')
-        #     # await bot.reply_to(message, response_chunk)
+            file_data = BufferedReader(CustomBytesIO(response_text.encode('utf-8'), filename="result.txt"))
+            await bot.send_document(chat_id, file_data)
     except Exception as e:
         # print(e)
         bing_context = []
@@ -1103,6 +1104,13 @@ async def bing(message, command_name):
             # await handle_exception({"time_text": time_text, "id": user_id, "fn": first_name, "ln": last_name})
             await handle_exception({"time_text": time_text, "chat_id": chat_id, "id": user_id,
                                     "fn": first_name, "ln": last_name, "command_name": command_name})
+        else:
+            await logging(logs=f"\033[31m[{get_time()}] "
+                               f"Chat Id: {chat_id} "
+                               f"Id: {user_id} Fn: {first_name} "
+                               f"Ln: {last_name} Do: {command_name} Ошибка:\n{type(e).__name__}: {str(e)}\033[0m",
+                          write_file=need_write_logs_file,
+                          logs_dir_=logs_dir)
 
         if not is_chat_mode:
             await bot.reply_to(message, f"При обработке запроса произошла ошибка. Пожалуйста, повторите попытку позже."
@@ -1126,7 +1134,7 @@ async def voice_text_help(message):
         await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                            f"Id: {user_id} Fn: {first_name} "
                            f"Ln: {last_name} Do: {text}",
-                      write_file=True,
+                      write_file=need_write_logs_file,
                       logs_dir_=logs_dir)
     voice_text_text = "Как конвертировать Голос → Текст?:\n" \
                       "1. Вызови /voice_to_text\n" \
@@ -1216,13 +1224,12 @@ async def voice_to_text(message, command_name):
     await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                        f"Id: {user_id} Fn: {first_name} "
                        f"Ln: {last_name} Do: {command_name}",
-                  write_file=True,
+                  write_file=need_write_logs_file,
                   logs_dir_=logs_dir)
     try:
         await bot.reply_to(message, "Аудио принято")
         file_info = await bot.get_file(message.voice.file_id)
         downloaded_file = await bot.download_file(file_info.file_path)
-        huggingface_token = config.HUGGINGFACE_TOKEN
         start_time = time.time()
         # voice_to_text_model = "openai/whisper-large-v2"
         voice_to_text_model = "openai/whisper-medium"
@@ -1232,7 +1239,7 @@ async def voice_to_text(message, command_name):
         while restart:
             spend_time = time.time() - start_time
             if count <= num_restart and spend_time < 5 * 60:
-                print(spend_time)
+                # print(spend_time)
                 count += 1
                 response = await voice_to_text_hf(downloaded_file, voice_to_text_model, huggingface_token)
                 try:
@@ -1271,12 +1278,12 @@ async def voice_to_text(message, command_name):
                 # print(f"EN: {text}")
                 try:
                     response = await work_with_db(db_name, sql, host="cloud.mindsdb.com",
-                                                  user=config.MINDSDB_USER, password=config.MINDSDB_PASSWORD)
+                                                  user=mindsdb_user, password=mindsdb_password)
                     # mindsdb = True
                     # print("mindsdb")
                 except (pymysql.err.ProgrammingError, pymysql.err.OperationalError,):
                     response = await work_with_db(db_name, sql, host="cloud.mindsdb.com",
-                                                  user=config.MINDSDB_USER, password=config.MINDSDB_PASSWORD)
+                                                  user=mindsdb_user, password=mindsdb_password)
                     # mindsdb = True
                     # print("mindsdb")
                 except (pymysql.err.ProgrammingError, pymysql.err.OperationalError,):
@@ -1358,7 +1365,7 @@ async def text_to_voice(message, command_name):
     await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                        f"Id: {user_id} Fn: {first_name} "
                        f"Ln: {last_name} Do: {command_name}",
-                  write_file=True,
+                  write_file=need_write_logs_file,
                   logs_dir_=logs_dir)
     # output_dir = f"temp/{user_id}/voice_text"
     #
@@ -1400,7 +1407,7 @@ async def user_info(message):
     await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                        f"Id: {user_id} Fn: {first_name} "
                        f"Ln: {last_name} Do: {raw_text}",
-                  write_file=True,
+                  write_file=need_write_logs_file,
                   logs_dir_=logs_dir)
     await bot.reply_to(message, f"Я собрал немного информации о тебе:\n"
                                 f"    • Id: {user_id}\n"
@@ -1425,7 +1432,7 @@ async def gen_words_help(message):
         await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                            f"Id: {user_id} Fn: {first_name} "
                            f"Ln: {last_name} Do: {text}",
-                      write_file=True,
+                      write_file=need_write_logs_file,
                       logs_dir_=logs_dir)
 
     gen_words_help_text = "Как генерировать русские слова из набора букв?\n" \
@@ -1458,7 +1465,7 @@ async def gen_words(message, command_name):
     await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                        f"Id: {user_id} Fn: {first_name} "
                        f"Ln: {last_name} Do: {command_name}",
-                  write_file=True,
+                  write_file=need_write_logs_file,
                   logs_dir_=logs_dir)
     if text != "" and text != " ":
         try:
@@ -1525,7 +1532,7 @@ async def get_app_help(message):
         await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                            f"Id: {user_id} Fn: {first_name} "
                            f"Ln: {last_name} Do: {text}",
-                      write_file=True,
+                      write_file=need_write_logs_file,
                       logs_dir_=logs_dir)
 
     get_app_help_text = "Что сделать для установки нашего приложения?\n" \
@@ -1618,7 +1625,7 @@ async def get_app(message):
     await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                        f"Id: {user_id} Fn: {first_name} "
                        f"Ln: {last_name} Do: {message.text}",
-                  write_file=True,
+                  write_file=need_write_logs_file,
                   logs_dir_=logs_dir)
 
     temp_path = rf"{os.getcwd()}/temp/{user_id}"
@@ -1661,7 +1668,7 @@ async def get_file_help(message):
         await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                            f"Id: {user_id} Fn: {first_name} "
                            f"Ln: {last_name} Do: {text}",
-                      write_file=True,
+                      write_file=need_write_logs_file,
                       logs_dir_=logs_dir)
 
     get_file_help_text = "Что сделать для установки файла по ссылке?\n" \
@@ -1704,7 +1711,7 @@ async def get_file(message, command_name):
     await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                        f"Id: {user_id} Fn: {first_name} "
                        f"Ln: {last_name} Do: {command_name}",
-                  write_file=True,
+                  write_file=need_write_logs_file,
                   logs_dir_=logs_dir)
 
     if not os.path.exists(temp_path):
@@ -1745,7 +1752,7 @@ async def menu(message, first=True):
         await logging(logs=f"[{get_time()}] Chat Id: {chat_id} "
                            f"Id: {user_id} Fn: {first_name} "
                            f"Ln: {last_name} Do: /menu",
-                      write_file=True,
+                      write_file=need_write_logs_file,
                       logs_dir_=logs_dir)
         await bot.send_message(chat_id, button_text, reply_markup=markup,
                                disable_web_page_preview=True)
@@ -1762,7 +1769,7 @@ async def menu(message, first=True):
 
 async def stop_bot(message):
     # global is_stop_bot
-    if message.from_user.id in config.ADMINS_LIST:
+    if message.from_user.id in admins_list:
         chat_id = message.chat.id
         user_id = message.from_user.id
         first_name = message.from_user.first_name
@@ -1772,7 +1779,7 @@ async def stop_bot(message):
         await logging(logs=f"[{time_text}] Chat Id: {chat_id} "
                            f"Id: {user_id} Fn: {first_name} "
                            f"Ln: {last_name} Do: {raw_text}",
-                      write_file=True,
+                      write_file=need_write_logs_file,
                       logs_dir_=logs_dir)
         await bot.reply_to(message, f"Останавливаю бота...")
         # is_stop_bot = True
@@ -1780,7 +1787,7 @@ async def stop_bot(message):
             asyncio.run(bot.delete_webhook())
             asyncio.run(app.shutdown())
         asyncio.run(logging(logs=f"[{get_time()}] Бот выключен :(\n",
-                            write_file=True,
+                            write_file=need_write_logs_file,
                             logs_dir_=logs_dir))
         os.kill(os.getpid(), signal.SIGTERM)
 
@@ -1788,23 +1795,103 @@ async def stop_bot(message):
 # count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
 # start_cur = time.time()
 
-#######################################
+##############################################################
+# --------------------------CONFIG----------------------------
+# ---Telegram---
+# Токен производственного бота телеграмм
+telegram_bot_token = config.TELEGRAM_BOT_TOKEN
+# Токен тестового бота телеграмм
+test_telegram_bot_token = config.TEST_TELEGRAM_BOT_TOKEN
+# ID чата телеграмм с логами
+telegram_logs_channel = config.TELEGRAM_LOGS_CHANNEL
+# ID чата телеграмм с рекламой
+telegram_ads_channel = config.TELEGRAM_ADS_CHANNEL
+# Максимальная длина для сообщения телеграмм
+max_message_length = config.MAX_MESSAGE_LENGTH
+# Разрешённое время между сообщениями (в секундах)
+timeout_messages = config.TIMEOUT_MESSAGES
+# ---Mindsdb---
+# Login Mindsdb
+mindsdb_user = config.MINDSDB_USER
+# Password Mindsdb
+mindsdb_password = config.MINDSDB_PASSWORD
+# ---Hugging Face---
+# Токен для доступа к моделям Hugging Face
+huggingface_token = config.HUGGINGFACE_TOKEN
+# ---WebHook and Polling---
+# WebHook URL
+webhook_tunnel_url = config.WEBHOOK_TUNNEL_URL
+# Проверять URL или взять из конфига
+check_tunnel = config.CHECK_TUNNEL
+# Запустить производственного бота или тестового
 is_production = config.IS_PRODUCTION
+# Запустить WebHook или Polling
 is_webhook = config.IS_WEBHOOK
-#######################################
+# ---Access---
+# ID админов
+admins_list = config.ADMINS_LIST
+# ---DataBases---
+# Имя базы данных для просмотра запросов пользователей
+user_prompts_db = config.USER_PROMPTS_DB
+# Имя базы данных для информации о пользователях
+user_data_db = config.USER_DATA_DB
+# ---Other---
+# Нужно ли записывать логи в файл
+need_write_logs_file = config.NEED_WRITE_LOGS_FILE
+##############################################################
+
+# Включение и отключение чат мода (Отправлять ли уведомления, например, "Запрос отправлен")
+is_chat_mode = False
+# Включение и отключение ссылок, в которых бинг искал ответ
+is_bing_links_enabled = False
+# Словарь для проверки на спам
+user_use_dict = {}
+
+user_state = {}
+
+work_dir = os.getcwd()
+data_dir = os.path.join(work_dir, "data")
+logs_dir = os.path.join(work_dir, "logs")
+temp_dir = os.path.join(work_dir, "temp")
+
+WEBHOOK_PATH = None
+WEBHOOK_URL = None
+
 
 # Считывание токена телеграм бота и создание его.
 if is_production:
-    bot = AsyncTeleBot(config.TELEGRAM_BOT_TOKEN, exception_handler=ExceptionHandler())
+    bot = AsyncTeleBot(telegram_bot_token, exception_handler=ExceptionHandler())
     if is_webhook:
-        WEBHOOK_PATH = f"/bot/{config.TELEGRAM_BOT_TOKEN}"
+        WEBHOOK_PATH = f"/bot/{telegram_bot_token}"
 else:
-    bot = AsyncTeleBot(config.TEST_TELEGRAM_BOT_TOKEN, exception_handler=ExceptionHandler())
+    bot = AsyncTeleBot(test_telegram_bot_token, exception_handler=ExceptionHandler())
     if is_webhook:
-        WEBHOOK_PATH = f"/bot/{config.TEST_TELEGRAM_BOT_TOKEN}"
+        WEBHOOK_PATH = f"/bot/{test_telegram_bot_token}"
 
 if is_webhook:
-    WEBHOOK_URL = f"{config.WebHook_TUNNEL_URL}{WEBHOOK_PATH}"
+    if check_tunnel:
+        command = "curl -s localhost:4040/api/tunnels"
+        webhook_tunnel_url = subprocess.run(command.split(), capture_output=True, text=True).stdout
+        # print(webhook_tunnel_url)
+        if not webhook_tunnel_url:
+            asyncio.run(logging(logs=f"[{get_time()}] WebHook URL не найден. Запускаю ngrok",
+                                write_file=need_write_logs_file,
+                                logs_dir_=logs_dir))
+            run_ngrok = os.system("nohup ngrok http 8443 &")
+            # print(run_ngrok, flush=True)
+            time.sleep(1)
+            command = "curl -s localhost:4040/api/tunnels"
+            webhook_tunnel_url = subprocess.run(command.split(), capture_output=True, text=True).stdout
+            # print(webhook_tunnel_url, flush=True)
+            if not webhook_tunnel_url:
+                os.kill(os.getpid(), signal.SIGTERM)
+            else:
+                webhook_tunnel_url = json.loads(webhook_tunnel_url)["tunnels"][0]["public_url"]
+                # print(webhook_tunnel_url, flush=True)
+        else:
+            webhook_tunnel_url = json.loads(webhook_tunnel_url)["tunnels"][0]["public_url"]
+    # print(webhook_tunnel_url)
+    WEBHOOK_URL = f"{webhook_tunnel_url}{WEBHOOK_PATH}"
     app = web.Application()
 
 
@@ -1830,11 +1917,6 @@ async def handle(request):
 if is_webhook:
     app.router.add_post(WEBHOOK_PATH, handle)
 
-work_dir = os.getcwd()
-data_dir = os.path.join(work_dir, "data")
-logs_dir = os.path.join(work_dir, "logs")
-temp_dir = os.path.join(work_dir, "temp")
-
 # count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
 # print("Дальше тормознутый элемент")
 # start_cur = time.time()
@@ -1856,25 +1938,7 @@ asyncio.run(bot.set_my_commands([
 # count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
 # start_cur = time.time()
 
-# Разрешённое время между сообщениями (в секундах)
-timeout_messages = 10
-# Включение и отключение чат мода (Отправлять ли уведомления, например, "Запрос отправлен")
-is_chat_mode = False
-# Включение и отключение ссылок, в которых бинг искал ответ
-is_bing_links_enabled = False
-# Словарь для проверки на спам
-user_use_dict = {}
-# Максимальная длина для сообщения телеграмм
-MAX_MESSAGE_LENGTH = 4096
-# Имя базы данных для запросов AI
-context_db = "context.db"
-# Имя базы данных для просмотра запросов пользователей
-user_prompts_db = "user_prompts.db"
-# Имя базы данных для информации о пользователях
-user_data_db = "user_data.db"
-user_state = {}
-
-actions = ["/gpt4", "/gpt3", "/bing", "/voice_to_text", "/to_ogg",  "/to_mp3",  "/to_wav", "/text_to_voice",
+actions = ["/gpt4", "/gpt3", "/bing", "/voice_to_text", "/to_ogg", "/to_mp3", "/to_wav", "/text_to_voice",
            "/gen_words_ru", "/get_file"]
 actions_text = {
     "/gpt4": "Отправьте вопрос к GPT4 в чат",
@@ -1893,21 +1957,9 @@ gpt_context_duration = datetime.timedelta(hours=2)
 # count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
 # start_cur = time.time()
 
-# work_with_db(context_db, data_dir,
-#              '''CREATE TABLE IF NOT EXISTS [name]
-#              (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, text TEXT, time DATETIME)''')
-
-# work_with_db(user_prompts_db, data_dir,
-#              '''CREATE TABLE IF NOT EXISTS [name]
-#              (id INTEGER PRIMARY KEY AUTOINCREMENT, fn TEXT, ln TEXT, user_id INTEGER, text TEXT, time DATETIME, command TEXT)''')
-
 asyncio.run(work_with_db(f"{data_dir}/{user_prompts_db}",
                          '''CREATE TABLE IF NOT EXISTS [name]
-                         (id INTEGER PRIMARY KEY AUTOINCREMENT, fn TEXT, ln TEXT, user_id INTEGER, text TEXT, time DATETIME, command TEXT)'''))
-
-# work_with_db(user_data_db, data_dir,
-#              '''CREATE TABLE IF NOT EXISTS [name]
-#              (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, fn TEXT, ln TEXT, start_in_Moscow TEXT)''')
+                         (id INTEGER PRIMARY KEY AUTOINCREMENT, fn TEXT, ln TEXT, user_id INTEGER, question TEXT, answer TEXT, time DATETIME, command TEXT)'''))
 
 asyncio.run(work_with_db(f"{data_dir}/{user_data_db}",
                          '''CREATE TABLE IF NOT EXISTS [name]
@@ -2007,7 +2059,7 @@ async def get_command_text(message):
     # print(text)
     if message.content_type == "text" and text != "/menu" and text != "/donation" and text != "/start":
         try:
-            if (await bot.get_chat_member(config.TELEGRAM_ADS_CHANNEL, user_id)).status == "left":
+            if (await bot.get_chat_member(telegram_ads_channel, user_id)).status == "left":
                 markup = telebot.types.InlineKeyboardMarkup()
                 markup.add(telebot.types.InlineKeyboardButton("Подписаться", "https://t.me/Zapzatron_Bot_Ads"))
                 await bot.send_message(chat_id, "Чтобы пользоваться ботом нужно подписаться на наш канал.",
@@ -2117,7 +2169,7 @@ async def get_command_text(message):
 async def run_info():
     start_time = get_time()
     await logging(logs=f"[{start_time}] Бот включён :)",
-                  write_file=True,
+                  write_file=need_write_logs_file,
                   logs_dir_=logs_dir)
     await logging(logs=f"Информация:\n"
                        f"  • Производство: {is_production}\n"
@@ -2127,7 +2179,7 @@ async def run_info():
                        f"  • Рабочая директория: {work_dir}\n"
                        f"  • Папка с данными: {data_dir}\n"
                        f"  • Папка с логами: {logs_dir}",
-                  write_file=True,
+                  write_file=need_write_logs_file,
                   logs_file_name=start_time[0:10],
                   logs_dir_=logs_dir)
 
@@ -2153,7 +2205,7 @@ async def run_webhook():
 def shutdown(signum, frame):
     # global is_stop_bot
     asyncio.run(logging(logs=f"[{get_time()}] Бот выключен :(\n",
-                        write_file=True,
+                        write_file=need_write_logs_file,
                         logs_dir_=logs_dir))
     # is_stop_bot = True
     if is_webhook:
