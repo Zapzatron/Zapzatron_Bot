@@ -4,6 +4,7 @@ logs
 temp
 data/*
 tests
+Check_DataBases.bat
 Zapzatron_Bot_Test.py
 Zapzatron_Bot.py
 ___Zapzatron_Bot_Async.py

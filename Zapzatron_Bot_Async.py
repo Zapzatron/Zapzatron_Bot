@@ -9,7 +9,7 @@ packages = {
     "gtts": "gTTS==2.3.2",
     "openai": "openai==0.27.0",
     "aiohttp": "aiohttp==3.8.4",
-    "EdgeGPT": "EdgeGPT==0.11.1",  # 0.8.2 (Говорят работает, но не особо как-то)
+    "EdgeGPT": "EdgeGPT==0.11.6",  # 0.8.2 (Говорят работает, но не особо как-то)
     "pandas": "pandas==1.3.5",
     "mindsdb_sdk": "mindsdb-sdk==1.0.2",
     "pymysql": "PyMySQL==1.0.3",
@@ -1870,26 +1870,33 @@ else:
 
 if is_webhook:
     if check_tunnel:
-        command = "curl -s localhost:4040/api/tunnels"
-        webhook_tunnel_url = subprocess.run(command.split(), capture_output=True, text=True).stdout
-        # print(webhook_tunnel_url)
-        if not webhook_tunnel_url:
-            asyncio.run(logging(logs=f"[{get_time()}] WebHook URL не найден. Запускаю ngrok",
-                                write_file=need_write_logs_file,
-                                logs_dir_=logs_dir))
-            run_ngrok = os.system("nohup ngrok http 8443 &")
-            # print(run_ngrok, flush=True)
-            time.sleep(1)
+        if platform.system() == "Linux":
             command = "curl -s localhost:4040/api/tunnels"
             webhook_tunnel_url = subprocess.run(command.split(), capture_output=True, text=True).stdout
-            # print(webhook_tunnel_url, flush=True)
+            # print(webhook_tunnel_url)
             if not webhook_tunnel_url:
-                os.kill(os.getpid(), signal.SIGTERM)
+                asyncio.run(logging(logs=f"[{get_time()}] WebHook URL не найден. Запускаю ngrok",
+                                    write_file=need_write_logs_file,
+                                    logs_dir_=logs_dir))
+                run_ngrok = os.system("nohup ngrok http 8443 &")
+                # print(run_ngrok, flush=True)
+                time.sleep(1)
+                command = "curl -s localhost:4040/api/tunnels"
+                webhook_tunnel_url = subprocess.run(command.split(), capture_output=True, text=True).stdout
+                # print(webhook_tunnel_url, flush=True)
+                if not webhook_tunnel_url:
+                    os.kill(os.getpid(), signal.SIGTERM)
+                else:
+                    webhook_tunnel_url = json.loads(webhook_tunnel_url)["tunnels"][0]["public_url"]
+                    # print(webhook_tunnel_url, flush=True)
             else:
                 webhook_tunnel_url = json.loads(webhook_tunnel_url)["tunnels"][0]["public_url"]
-                # print(webhook_tunnel_url, flush=True)
-        else:
-            webhook_tunnel_url = json.loads(webhook_tunnel_url)["tunnels"][0]["public_url"]
+        elif platform.system() == "Windows":
+            asyncio.run(logging(logs=f"[{get_time()}] ngrok пока не доступен на windows",
+                                write_file=need_write_logs_file,
+                                logs_dir_=logs_dir))
+            os.kill(os.getpid(), signal.SIGTERM)
+
     # print(webhook_tunnel_url)
     WEBHOOK_URL = f"{webhook_tunnel_url}{WEBHOOK_PATH}"
     app = web.Application()
