@@ -9,7 +9,7 @@ packages = {
     "gtts": "gTTS==2.3.2",
     "openai": "openai==0.27.0",
     "aiohttp": "aiohttp==3.8.4",
-    "EdgeGPT": "EdgeGPT==0.11.6",  # 0.8.2 (Говорят работает, но не особо как-то)
+    "EdgeGPT": "EdgeGPT==0.11.8",
     "pandas": "pandas==1.3.5",
     "mindsdb_sdk": "mindsdb-sdk==1.0.2",
     "pymysql": "PyMySQL==1.0.3",
@@ -21,6 +21,7 @@ packages = {
     "requests": "requests==2.28.2",
     "lxml": "lxml==4.9.2",
     "nest_asyncio": "nest_asyncio==1.5.6",
+    "aiocron": "aiocron==1.8",
 }
 
 # import time
@@ -92,6 +93,7 @@ import nest_asyncio  # Используются для исправления as
 import re  # Используются для работы с регулярными выражениями
 import aiosqlite  # Используются для создания асинхронного интерфейса к базам данных SQLite
 import aiohttp  # Используется для создания асинхронного HTTP-клиента
+import aiocron
 
 
 # count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
@@ -499,7 +501,7 @@ async def work_with_db(db_path, sql, params=None, host="", user="", password="")
         if not (content is None):
             return content
         else:
-            return False
+            return ""
     else:
         # async with aiosqlite.connect(db_path, loop=loop) as db:
         async with aiosqlite.connect(db_path) as db:
@@ -1789,7 +1791,10 @@ async def stop_bot(message):
         asyncio.run(logging(logs=f"[{get_time()}] Бот выключен :(\n",
                             write_file=need_write_logs_file,
                             logs_dir_=logs_dir))
-        os.kill(os.getpid(), signal.SIGTERM)
+        if platform.system() == "Linux" and is_systemd:
+            os.system(f"systemctl stop {service_name}")
+        else:
+            os.kill(os.getpid(), signal.SIGTERM)
 
 
 # count_time += 1; print(f"{count_time}. Прошло {time.time() - start_cur} секунд.")
@@ -1827,6 +1832,9 @@ check_tunnel = config.CHECK_TUNNEL
 is_production = config.IS_PRODUCTION
 # Запустить WebHook или Polling
 is_webhook = config.IS_WEBHOOK
+# ---Running Bot---
+is_systemd = config.IS_SYSTEMD
+service_name = config.SERVICE_NAME
 # ---Access---
 # ID админов
 admins_list = config.ADMINS_LIST
@@ -1885,7 +1893,10 @@ if is_webhook:
                 webhook_tunnel_url = subprocess.run(command.split(), capture_output=True, text=True).stdout
                 # print(webhook_tunnel_url, flush=True)
                 if not webhook_tunnel_url:
-                    os.kill(os.getpid(), signal.SIGTERM)
+                    if platform.system() == "Linux" and is_systemd:
+                        os.system(f"systemctl stop {service_name}")
+                    else:
+                        os.kill(os.getpid(), signal.SIGTERM)
                 else:
                     webhook_tunnel_url = json.loads(webhook_tunnel_url)["tunnels"][0]["public_url"]
                     # print(webhook_tunnel_url, flush=True)
@@ -1895,7 +1906,10 @@ if is_webhook:
             asyncio.run(logging(logs=f"[{get_time()}] ngrok пока не доступен на windows",
                                 write_file=need_write_logs_file,
                                 logs_dir_=logs_dir))
-            os.kill(os.getpid(), signal.SIGTERM)
+            if platform.system() == "Linux" and is_systemd:
+                os.system(f"systemctl stop {service_name}")
+            else:
+                os.kill(os.getpid(), signal.SIGTERM)
 
     # print(webhook_tunnel_url)
     WEBHOOK_URL = f"{webhook_tunnel_url}{WEBHOOK_PATH}"
@@ -2044,12 +2058,14 @@ async def get_command_text(message):
     if round(time.time()) - message.date > 1 * 60:  # 1 минута
         return
 
-    if message.chat.type != "private":
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+
+    # message.chat.type != "private"
+    if chat_id != user_id:
         await bot.reply_to(message, "Бот доступен только в → https://t.me/Zapzatron_Bot")
         return
 
-    chat_id = message.chat.id
-    user_id = message.from_user.id
     first_name = message.from_user.first_name
     last_name = message.from_user.last_name
     text = message.text
@@ -2211,7 +2227,7 @@ async def run_webhook():
 
 def shutdown(signum, frame):
     # global is_stop_bot
-    asyncio.run(logging(logs=f"[{get_time()}] Бот выключен :(\n",
+    asyncio.run(logging(logs=f"[{get_time()}] Бот выключен :(",
                         write_file=need_write_logs_file,
                         logs_dir_=logs_dir))
     # is_stop_bot = True
@@ -2225,16 +2241,31 @@ def shutdown(signum, frame):
 
 signal.signal(signal.SIGINT, shutdown)
 
+
+# @aiocron.crontab('*/1 * * * 3,7')
+# @aiocron.crontab('*/1 * * * *')
+# Формат cron состоит из 5 полей, которые указывают на минуты, часы, дни месяца, месяцы и дни недели соответственно.
+@aiocron.crontab('59 20 * * 3,7')
+async def reboot_system():
+    # Москва (UTC +3) 03:59 --> UTC 00:59
+    # 23:59 --> 20:59
+    if platform.system() == "Linux":
+        asyncio.run(logging(logs=f"[{get_time()}] Перезапуск Ubuntu через 15 секунд",
+                            write_file=need_write_logs_file,
+                            logs_dir_=logs_dir))
+        asyncio.run(logging(logs=f"[{get_time()}] Бот выключен :(",
+                            write_file=need_write_logs_file,
+                            logs_dir_=logs_dir))
+
+        if is_webhook:
+            asyncio.run(bot.delete_webhook())
+        os.system('sleep 15 && sudo reboot')
+
+
 if __name__ == "__main__":
     while True:
         try:
-            # if is_stop_bot:
-            #     # asyncio.run(logging(logs=f"[{get_time()}] Бот выключен :(\n",
-            #     #                     write_file=True,
-            #     #                     logs_dir_=logs_dir))
-            #     break
             asyncio.run(run_info())
-            # asyncio_helper.proxy = {"http": "157.245.27.9:3128"}
             if is_webhook:
                 loop = asyncio.new_event_loop()
                 loop.create_task(run_webhook())
