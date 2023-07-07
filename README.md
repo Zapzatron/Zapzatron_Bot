@@ -35,7 +35,7 @@ To get community support, you can:
   <img src="https://contributors-img.web.app/image?repo=Zapzatron/Zapzatron_Bot" />
 </a>
 
-Made with [contributors-img](https://contributors-img.web.app).
+Made with [contributors-img](https://contrib.rocks/preview?repo=Zapzatron/Zapzatron_Bot).
 
 ## License
 
